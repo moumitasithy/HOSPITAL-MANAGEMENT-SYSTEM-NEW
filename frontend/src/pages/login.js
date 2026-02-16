@@ -6,51 +6,58 @@ const Login = () => {
     const navigate = useNavigate();
     const location = useLocation();
     
-    // ১. ইনপুট ডাটা রাখার জন্য স্টেট
     const [formData, setFormData] = useState({
         email: '',
         password: ''
     });
 
     const userRole = location.state?.role || 'User';
-    const redirectPath = location.state?.from || '/dashboard'; 
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // ২. আসল লগইন হ্যান্ডলার (যা ডাটাবেস চেক করবে)
     const handleLogin = async (e) => {
-    e.preventDefault(); 
-    
-    try {
-        const response = await fetch('http://localhost:5000/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: formData.email, password: formData.password }),
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            // ১. এখানে 'user' ব্যবহার করুন (সিঙ্গুলার)
-            const userData = result.user; 
-            
-            localStorage.setItem('user', JSON.stringify(userData));
-            alert(`Welcome ${userData.name}!`);
-            
-            // ২. রোল চেক করার সময় ব্যাকএন্ডের কলাম নামের সাথে মিল রাখুন (role_name)
-            navigate(redirectPath, { 
-                state: { role: userData.role } 
+        e.preventDefault(); 
+        
+        try {
+            const response = await fetch('http://localhost:5000/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: formData.email, password: formData.password }),
             });
-        } else {
-            alert(result.error || "Login failed!");
+
+            const result = await response.json();
+
+            if (response.ok) {
+                const userData = result.user; 
+                
+                // ইউজার ডাটা লোকাল স্টোরেজে সেভ করা
+                localStorage.setItem('user', JSON.stringify(userData));
+                
+                alert(`Welcome ${userData.name}!`);
+                
+                // --- রোল অনুযায়ী অটোমেটিক ড্যাশবোর্ডে পাঠানো ---
+                // ডাটাবেস থেকে আসা রোল চেক করা হচ্ছে (ধরে নিচ্ছি 'role' ফিল্ডে নাম থাকে)
+                if (userData.role === 'Receptionist') {
+                    navigate('/receptionist-dashboard');
+                } else if (userData.role === 'Doctor') {
+                    navigate('/doctor-dashboard');
+                } else if (userData.role === 'Admin') {
+                    navigate('/admin-dashboard');
+                } else {
+                    // যদি অন্য কোনো সাধারণ ইউজার হয়
+                    navigate('/dashboard'); 
+                }
+                
+            } else {
+                alert(result.error || "Login failed!");
+            }
+        } catch (error) {
+            alert("Server not responding. Please check if your backend is running.");
         }
-    } catch (error) {
-        // ব্যাকএন্ডে এরর হলে বা সার্ভার বন্ধ থাকলে এটি দেখাবে
-        alert("Server not responding. Please check if your backend is running on port 5000.");
-    }
-};
+    };
+
     const styles = {
         container: {
             height: '100vh', width: '100%',
@@ -85,7 +92,7 @@ const Login = () => {
                 
                 <form onSubmit={handleLogin}>
                     <input 
-                        name="email" // name প্রোপার্টি জরুরি
+                        name="email" 
                         style={styles.input} 
                         type="email" 
                         placeholder="Email Address" 

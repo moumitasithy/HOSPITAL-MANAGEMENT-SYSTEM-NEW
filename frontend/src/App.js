@@ -9,7 +9,8 @@ import Login from './pages/login';
 import CreateAccount from './pages/createaccount';
 import Dashboard from './pages/dashboard';
 import Appointment from './pages/appoinment';
-
+import Medicines from './pages/Medicines';
+import ReceptionistDashboard from './pages/ReceptionistDashboard';
 function App() {
   return (
     <Router>
@@ -30,6 +31,8 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />}
          />
          <Route path="/appointment" element={<Appointment />} />
+         <Route path="/medicines" element={<Medicines />} />
+         <Route path="/receptionist-dashboard" element={<ReceptionistDashboard />} />
       </Routes>
     </Router>
   );
