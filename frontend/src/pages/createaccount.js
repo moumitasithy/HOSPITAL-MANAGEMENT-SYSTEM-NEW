@@ -8,40 +8,38 @@ const CreateAccount = () => {
     const [specList, setSpecList] = useState([]);
     const [qualList, setQualList] = useState([]);
     const [loading, setLoading] = useState(false);
-    
-    // ১. ফাইলের জন্য নতুন স্টেট
     const [selectedFile, setSelectedFile] = useState(null);
 
     const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        phone: '',
-        password: '',
-        role: 'Doctor', 
-        consultation_fee: '',
-        specialization: '', 
-        qualification: ''   
+        name: '', email: '', phone: '', password: '',
+        role: 'Doctor', consultation_fee: '',
+        specialization: '', qualification: ''   
     });
 
-    useEffect(() => {
-        const fetchDropdownData = async () => {
-            try {
-                const specRes = await fetch('http://localhost:5000/api/specializations');
-                const qualRes = await fetch('http://localhost:5000/api/qualifications');
-                setSpecList(await specRes.json());
-                setQualList(await qualRes.json());
-            } catch (err) {
-                console.error("Error fetching dropdown data:", err);
-            }
-        };
-        fetchDropdownData();
-    }, []);
+   useEffect(() => {
+    const fetchDropdownData = async () => {
+        try {
+            const specRes = await fetch('http://localhost:5000/api/specializations');
+            // এন্ডপয়েন্টটি ছোট হাতের অক্ষরে লিখুন
+            const qualRes = await fetch('http://localhost:5000/api/qualifications');
+            
+            const sData = await specRes.json();
+            const qData = await qualRes.json();
+            
+            // ডাটাবেস কলামের সাথে মিলিয়ে নিশ্চিত করুন ডাটা আসছে
+            setSpecList(Array.isArray(sData) ? sData : []);
+            setQualList(Array.isArray(qData) ? qData : []);
+        } catch (err) {
+            console.error("Error:", err);
+        }
+    };
+    fetchDropdownData();
+}, []);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // ২. ফাইল হ্যান্ডলিং ফাংশন
     const handleFileChange = (e) => {
         setSelectedFile(e.target.files[0]);
     };
@@ -49,8 +47,6 @@ const CreateAccount = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-
-        // ৩. FormData ব্যবহার (JSON-এর বদলে)
         const data = new FormData();
         data.append('name', formData.name);
         data.append('email', formData.email);
@@ -59,7 +55,7 @@ const CreateAccount = () => {
         data.append('role', formData.role);
 
         if (formData.role === 'Doctor') {
-            data.append('image', selectedFile); // ফাইলটি এখানে যাচ্ছে
+            data.append('image', selectedFile);
             data.append('consultation_fee', formData.consultation_fee);
             data.append('specialization', formData.specialization);
             data.append('qualification', formData.qualification);
@@ -68,12 +64,9 @@ const CreateAccount = () => {
         try {
             const response = await fetch('http://localhost:5000/api/createaccount', { 
                 method: 'POST',
-                // FormData পাঠালে headers দেওয়ার প্রয়োজন নেই, ব্রাউজার নিজে সেট করে নেয়
                 body: data, 
             });
-            
             const result = await response.json();
-
             if (response.ok) {
                 alert("Account created successfully!");
                 navigate('/login');
@@ -87,6 +80,7 @@ const CreateAccount = () => {
         }
     };
 
+    // স্টাইল আগের মতোই থাকবে
     const styles = {
         container: { height: '100vh', width: '100%', backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url(${coverImage})`, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center', fontFamily: "'Segoe UI', Roboto, sans-serif" },
         formBox: { backgroundColor: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(10px)', padding: '30px 40px', borderRadius: '20px', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)', width: '450px', textAlign: 'center', color: 'white', border: '1px solid rgba(255, 255, 255, 0.2)', maxHeight: '90vh', overflowY: 'auto' },
@@ -102,19 +96,10 @@ const CreateAccount = () => {
         <div style={styles.container}>
             <div style={styles.formBox}>
                 <h2 style={{ marginBottom: '20px' }}>Join Our Hospital</h2>
-                
                 <form onSubmit={handleSubmit}>
-                    <div style={styles.inputGroup}>
-                        <input name="name" style={styles.input} type="text" placeholder="Full Name" required onChange={handleChange} />
-                    </div>
-
-                    <div style={styles.inputGroup}>
-                        <input name="email" style={styles.input} type="email" placeholder="Email Address" required onChange={handleChange} />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                        <input name="phone" style={{ ...styles.input, flex: 1 }} type="tel" placeholder="Phone Number" required onChange={handleChange} />
-                    </div>
+                    <input name="name" style={{...styles.input, marginBottom: '15px'}} type="text" placeholder="Full Name" required onChange={handleChange} />
+                    <input name="email" style={{...styles.input, marginBottom: '15px'}} type="email" placeholder="Email Address" required onChange={handleChange} />
+                    <input name="phone" style={{...styles.input, marginBottom: '15px'}} type="tel" placeholder="Phone Number" required onChange={handleChange} />
 
                     <div style={styles.inputGroup}>
                         <label style={styles.label}>Register As:</label>
@@ -127,27 +112,17 @@ const CreateAccount = () => {
 
                     {formData.role === 'Doctor' && (
                         <>
-                            {/* ৪. URL-এর বদলে ফাইল ইনপুট */}
                             <div style={styles.inputGroup}>
                                 <label style={styles.label}>Upload Profile Image:</label>
-                                <input 
-                                    style={{...styles.input, padding: '5px'}} 
-                                    type="file" 
-                                    accept="image/*" 
-                                    required 
-                                    onChange={handleFileChange} 
-                                />
+                                <input style={{...styles.input, padding: '5px'}} type="file" accept="image/*" required onChange={handleFileChange} />
                             </div>
-                            
-                            <div style={styles.inputGroup}>
-                                <input name="consultation_fee" style={styles.input} type="number" placeholder="Consultation Fee (BDT)" required onChange={handleChange} />
-                            </div>
+                            <input name="consultation_fee" style={{...styles.input, marginBottom: '15px'}} type="number" placeholder="Consultation Fee (BDT)" required onChange={handleChange} />
                             
                             <div style={styles.inputGroup}>
                                 <label style={styles.label}>Specialization:</label>
                                 <select name="specialization" style={styles.select} required onChange={handleChange} value={formData.specialization}>
                                     <option value="">Select Specialization</option>
-                                    {specList.map(spec => (
+                                    {specList?.map(spec => (
                                         <option key={spec.specialization_id} value={spec.specialization_id}>
                                             {spec.specialization_name}
                                         </option>
@@ -158,26 +133,24 @@ const CreateAccount = () => {
                             <div style={styles.inputGroup}>
                                 <label style={styles.label}>Qualification:</label>
                                 <select name="qualification" style={styles.select} required onChange={handleChange} value={formData.qualification}>
-                                    <option value="">Select Qualification</option>
-                                    {qualList.map(qual => (
-                                        <option key={qual.qualification_id} value={qual.qualification_id}>
-                                            {qual.qualification_name}
-                                        </option>
-                                    ))}
-                                </select>
+    <option value="">Select Qualification</option>
+    {/* qualList?.map ব্যবহার করলে ডাটা না থাকলেও পেজ ক্রাশ করবে না */}
+    {qualList?.map((qual) => (
+        <option key={qual.qualification_id} value={qual.qualification_id}>
+            {qual.qualification_name}
+        </option>
+    ))}
+</select>
                             </div>
                         </>
                     )}
 
-                    <div style={styles.inputGroup}>
-                        <input name="password" style={styles.input} type="password" placeholder="Create Password" required onChange={handleChange} />
-                    </div>
+                    <input name="password" style={{...styles.input, marginTop: '15px'}} type="password" placeholder="Create Password" required onChange={handleChange} />
 
                     <button style={styles.button} type="submit" disabled={loading}>
                         {loading ? "Creating..." : "Create Account"}
                     </button>
                 </form>
-
                 <p style={{ marginTop: '15px', fontSize: '14px' }}>
                     Already have an account? <span style={styles.link} onClick={() => navigate('/login')}>Login</span>
                 </p>

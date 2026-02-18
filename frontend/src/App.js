@@ -1,38 +1,87 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// পেজগুলো ইমপোর্ট করা হচ্ছে
-// আপনার ফাইলের নাম (Capital/Small letter) ঠিক আছে কি না চেক করে নিন
+// পেজগুলো ইমপোর্ট করা হচ্ছে - নিশ্চিত করুন ফাইলের নাম এবং পাথ সঠিক আছে
 import Home from './pages/Home';
 import Doctors from './pages/Doctor';
 import Login from './pages/login'; 
-import CreateAccount from './pages/createaccount';
+import CreateAccount from './pages/createaccount'; // নিশ্চিত করুন ফাইলে export default আছে
 import Dashboard from './pages/dashboard';
 import Appointment from './pages/appoinment';
 import Medicines from './pages/Medicines';
 import ReceptionistDashboard from './pages/ReceptionistDashboard';
+import DoctorDashboard from './pages/DoctorDashboard'; 
+import DoctorSchedule from './pages/DoctorSchedule'; 
+
+// প্রোটেক্টেড রাউট ফাংশন
+const ProtectedRoute = ({ children, allowedRole }) => {
+    const userString = localStorage.getItem('user');
+    
+    // ইউজার ডাটা না থাকলে সরাসরি লগইন-এ পাঠিয়ে দেবে
+    if (!userString) {
+        return <Navigate to="/login" />;
+    }
+
+    try {
+        const user = JSON.parse(userString);
+        if (user.role !== allowedRole) {
+            return <Navigate to="/login" />;
+        }
+        return children;
+    } catch (error) {
+        console.error("User data parse error:", error);
+        return <Navigate to="/login" />;
+    }
+};
+
 function App() {
   return (
     <Router>
       <Routes>
-        {/* ১. হোম পেজ (সবার আগে এটি দেখাবে) */}
+        {/* সবার জন্য উন্মুক্ত রাউট */}
         <Route path="/" element={<Home />} />
-        
-        {/* ২. ডাক্তারদের লিস্ট পেজ */}
         <Route path="/Doctors" element={<Doctors />} />
-        
-        {/* ৩. লগইন পেজ (এখানে রোল অনুযায়ী টাইটেল চেঞ্জ হবে) */}
         <Route path="/login" element={<Login />} />
-        
-        {/* ৪. নতুন অ্যাকাউন্ট খোলার পেজ */}
         <Route path="/create-account" element={<CreateAccount />} />
-        
-        {/* ৫. ড্যাশবোর্ড (লগইন করার পর এখানে যাবে) */}
-        <Route path="/dashboard" element={<Dashboard />}
-         />
-         <Route path="/appointment" element={<Appointment />} />
-         <Route path="/medicines" element={<Medicines />} />
-         <Route path="/receptionist-dashboard" element={<ReceptionistDashboard />} />
+        <Route path="/appointment" element={<Appointment />} />
+        <Route path="/medicines" element={<Medicines />} />
+
+        {/* সাধারণ ড্যাশবোর্ড */}
+        <Route path="/dashboard" element={<Dashboard />} />
+
+        {/* ১. রিসেপশনিস্ট ড্যাশবোর্ড */}
+        <Route 
+          path="/receptionist-dashboard" 
+          element={
+            <ProtectedRoute allowedRole="Receptionist">
+              <ReceptionistDashboard />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* ২. ডাক্তার ড্যাশবোর্ড */}
+        <Route 
+          path="/doctor-dashboard" 
+          element={
+            <ProtectedRoute allowedRole="Doctor">
+              <DoctorDashboard />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* ৩. ডাক্তার শিডিউল পেজ */}
+        <Route 
+          path="/doctor-schedule" 
+          element={
+            <ProtectedRoute allowedRole="Doctor">
+              <DoctorSchedule />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* ভুল ইউআরএল দিলে হোমে ব্যাক করবে */}
+        <Route path="*" element={<Navigate to="/" />} />
+
       </Routes>
     </Router>
   );

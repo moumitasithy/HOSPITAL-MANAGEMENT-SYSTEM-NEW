@@ -11,6 +11,7 @@ const Login = () => {
         password: ''
     });
 
+    // আগের পেজ থেকে আসা রোল (অপশনাল)
     const userRole = location.state?.role || 'User';
 
     const handleChange = (e) => {
@@ -32,26 +33,31 @@ const Login = () => {
             if (response.ok) {
                 const userData = result.user; 
                 
-                // ইউজার ডাটা লোকাল স্টোরেজে সেভ করা
+                // ইউজার ডাটা লোকাল স্টোরেজে সেভ করা (যাতে প্রোটেক্টেড রাউট কাজ করে)
                 localStorage.setItem('user', JSON.stringify(userData));
                 
                 alert(`Welcome ${userData.name}!`);
                 
-                // --- রোল অনুযায়ী অটোমেটিক ড্যাশবোর্ডে পাঠানো ---
-                // ডাটাবেস থেকে আসা রোল চেক করা হচ্ছে (ধরে নিচ্ছি 'role' ফিল্ডে নাম থাকে)
-                if (userData.role === 'Receptionist') {
-                    navigate('/receptionist-dashboard');
-                } else if (userData.role === 'Doctor') {
+                // --- রোল অনুযায়ী অটোমেটিক ড্যাশবোর্ডে পাঠানো ---
+                // ডাটাবেসে যদি 'Doctor' থাকে তবে '/doctor-dashboard' এ যাবে
+                if (userData.role === 'Doctor') {
                     navigate('/doctor-dashboard');
-                } else if (userData.role === 'Admin') {
+                } 
+                // ডাটাবেসে যদি 'Receptionist' থাকে তবে '/receptionist-dashboard' এ যাবে
+                else if (userData.role === 'Receptionist') {
+                    navigate('/receptionist-dashboard');
+                } 
+                // অ্যাডমিন হলে (যদি থাকে)
+                else if (userData.role === 'Admin') {
                     navigate('/admin-dashboard');
-                } else {
-                    // যদি অন্য কোনো সাধারণ ইউজার হয়
+                } 
+                // সাধারণ ইউজার/পেশেন্ট হলে
+                else {
                     navigate('/dashboard'); 
                 }
                 
             } else {
-                alert(result.error || "Login failed!");
+                alert(result.error || "Login failed! Please check your credentials.");
             }
         } catch (error) {
             alert("Server not responding. Please check if your backend is running.");
@@ -74,7 +80,7 @@ const Login = () => {
         },
         input: {
             width: '100%', padding: '12px', margin: '10px 0', borderRadius: '8px',
-            border: 'none', fontSize: '16px', outline: 'none'
+            border: 'none', fontSize: '16px', outline: 'none', color: '#333'
         },
         button: {
             width: '100%', padding: '12px',
