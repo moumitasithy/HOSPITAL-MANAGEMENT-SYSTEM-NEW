@@ -23,7 +23,17 @@ const upload = multer({ storage: storage });
 
 // --- API Routes ---
 
-// ১. অ্যাপয়েন্টমেন্ট বুকিং
+
+app.get('/users', async (req, res) => {
+  try {
+    const allUsers = await pool.query("SELECT * FROM users");
+    res.json(allUsers.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
+
 app.post('/api/book-appointment-full', async (req, res) => {
     const { 
         name, phone_number, email, age, gender, blood_group, patient_type,
@@ -148,7 +158,7 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
 
             if (qualification && qualification !== "" && qualification !== "undefined") {
                 await client.query(
-                    "INSERT INTO doctor_qualification (qualification_id, doctor_id) VALUES($1, $2)", 
+                    "INSERT INTO qualification_doctor (qualification_id, doctor_id) VALUES($1, $2)", 
                     [parseInt(qualification), userId]
                 );
             }
@@ -172,17 +182,17 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
         client.release();
     }
 });
-
-// ৪. অ্যাপয়েন্টমেন্ট কনফার্ম করা (রিসেপশনিস্টের জন্য)
 app.put('/api/confirm-appointment/:id', async (req, res) => {
     const { id } = req.params;
+    const { receptionist_id } = req.body;
     try {
-        // স্ট্যাটাস 'Approved' করা হচ্ছে
         await pool.query(
-            "UPDATE appointments SET status = 'Approved' WHERE appointment_id = $1",
-            [id]
+            `UPDATE appointments 
+             SET status = 'Confirmed', receptionists_id = $1 
+             WHERE appointment_id = $2`,
+            [receptionist_id || 2, id] // আইডি ২ ডিফল্ট হিসেবে (কারিম হাসান)
         );
-        res.json({ success: true, message: "Appointment fixed successfully!" });
+        res.json({ success: true, message: "Appointment Confirmed" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -202,7 +212,21 @@ app.get('/api/doctor-schedules', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
+// ৮. ডক্টর শিডিউল সেভ করা (DoctorSchedule.js এর জন্য)
+app.post('/api/add-doctor-schedule', async (req, res) => {
+    const { doctor_id, date, day, hours_start, hours_end, details } = req.body;
+    try {
+        const result = await pool.query(
+            `INSERT INTO schedules (doctor_id, date, day, hours_start, hours_end, details, is_active) 
+             VALUES ($1, $2, $3, $4, $5, $6, 1) RETURNING *`, 
+            [doctor_id, date, day, hours_start, hours_end, details]
+        );
+        res.status(201).json({ success: true, message: "Schedule Saved!", data: result.rows[0] });
+    } catch (err) {
+        console.error("Save Schedule Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
 // ৬. ড্রপডাউন ডাটা (Specializations & Qualifications)
 app.get('/api/specializations', async (req, res) => {
     try {
@@ -254,17 +278,45 @@ app.get('/api/search-doctors-service', async (req, res) => {
 // কনফার্ম অ্যাপয়েন্টমেন্ট
 app.put('/api/confirm-appointment/:id', async (req, res) => {
     const { id } = req.params;
-    const { receptionist_id } = req.body;
+    const { receptionist_id } = req.body; // ফ্রন্টএন্ড থেকে আসা ৫
+
     try {
-        await pool.query(
+        const result = await pool.query(
             "UPDATE appointments SET status = 'Confirmed', receptionists_id = $1 WHERE appointment_id = $2",
             [receptionist_id, id]
         );
-        res.json({ message: "Confirmed" });
+        res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message);
+        res.status(500).json({ error: "DB Error: " + err.message });
     }
 });
+app.get('/api/doctors-list', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                u.user_id,
+                u.name, 
+                d.consultation_fee, 
+                d.image_url,
+                COALESCE(STRING_AGG(DISTINCT s.specialization_name, ', '), 'General') as specializations,
+                COALESCE(STRING_AGG(DISTINCT q.qualification_name, ', '), 'MBBS') as qualifications
+            FROM doctors d
+            JOIN users u ON d.user_id = u.user_id
+            LEFT JOIN doctor_specialization ds ON d.user_id = ds.doctor_id
+            LEFT JOIN specializations s ON ds.specialization_id = s.specialization_id
+            LEFT JOIN doctor_qualification dq ON d.user_id = dq.doctor_id
+            LEFT JOIN qualification q ON dq.qualification_id = q.qualification_id
+            GROUP BY u.user_id, u.name, d.consultation_fee, d.image_url;
+        `;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Doctor List Error:", err.message);
+        res.status(500).json({ error: "Failed to fetch doctors" });
+    }
+});
+
 
 // মেডিসিন এপিআই
 app.get('/api/medicines', async (req, res) => {
@@ -275,6 +327,24 @@ app.get('/api/medicines', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+app.post('/api/buy-medicine', async (req, res) => {
+    const { medicine_id, buy_quantity } = req.body;
+    try {
+        // স্টকে পর্যাপ্ত মেডিসিন আছে কি না চেক করা এবং আপডেট করা
+        const result = await pool.query(
+            "UPDATE medicines SET quantity_instock = quantity_instock - $1 WHERE medicine_id = $2 AND quantity_instock >= $1 RETURNING *",
+            [buy_quantity, medicine_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: "Insufficient stock or medicine not found!" });
+        }
+        res.json({ message: "Purchase successful!", data: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // স্পেশালাইজেশন লিস্ট পাওয়ার এপিআই
 
 

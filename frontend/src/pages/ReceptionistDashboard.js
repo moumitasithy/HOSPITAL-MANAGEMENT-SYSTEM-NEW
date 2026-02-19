@@ -41,28 +41,36 @@ const ReceptionistDashboard = () => {
             alert("Could not load doctor schedule");
         }
     };
+const handleConfirm = async (apptId) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    
+    // কনসোলে চেক করে নিন আইডি ৫ আসছে কি না
+    console.log("Logged in user data:", user);
 
-    const handleConfirm = async (id) => {
-        if (!receptionist) return alert("Please login first!");
+    // আপনার অবজেক্টে যদি user_id না থাকে তবে শুধু id ট্রাই করুন
+    const ridwanId = user?.user_id || user?.id; 
 
-        try {
-            const res = await fetch(`http://localhost:5000/api/confirm-appointment/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' }
-            });
+    if (!ridwanId) return alert("User ID not found. Please logout and login again.");
 
-            if (res.ok) {
-                alert("Appointment fixed successfully!"); 
-                fetchAppointments(); 
-            } else {
-                const result = await res.json();
-                alert(result.error || "Confirmation failed!");
-            }
-        } catch (err) {
-            alert("Server connection failed!");
+    try {
+        const res = await fetch(`http://localhost:5000/api/confirm-appointment/${apptId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receptionist_id: ridwanId }) // আইডি পাঠানো হচ্ছে
+        });
+
+        if (res.ok) {
+            alert("Success!");
+            fetchAppointments();
+        } else {
+            const errData = await res.json();
+            alert("Error: " + errData.error);
         }
-    };
-
+    } catch (err) {
+        alert("Server failed!");
+    }
+};
+    
     const handleLogout = () => {
         localStorage.removeItem('user');
         window.location.href = '/login';

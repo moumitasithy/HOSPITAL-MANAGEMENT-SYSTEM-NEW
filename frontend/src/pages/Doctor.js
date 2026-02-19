@@ -7,34 +7,34 @@ const Doctors = () => {
     const [doctorsList, setDoctorsList] = useState([]);
     const [loading, setLoading] = useState(true);
 
- useEffect(() => {
-    const fetchDoctors = async () => {
-        try {
-            const response = await fetch('http://localhost:5000/api/doctors-list');
-            const data = await response.json();
-            
-            // ডাটা কি আসলেই একটা লিস্ট (Array) কি না চেক করা
-            if (Array.isArray(data)) {
-                setDoctorsList(data);
-            } else {
-                setDoctorsList([]); 
-            }
-        } catch (error) {
-            console.error("Error fetching doctors:", error);
-            setDoctorsList([]); 
-        } finally {
-            setLoading(false);
-        }
-    };
+    useEffect(() => {
+        const fetchDoctors = async () => {
+            try {
+                const response = await fetch('http://localhost:5000/api/doctors-list');
+                const data = await response.json();
 
-    fetchDoctors(); // এই লাইনটি আপনার কোডে মিসিং ছিল, এটি অবশ্যই যোগ করুন!
-}, []);
+                // ডাটা কি আসলেই একটা লিস্ট (Array) কি না চেক করা
+                if (Array.isArray(data)) {
+                    setDoctorsList(data);
+                } else {
+                    setDoctorsList([]);
+                }
+            } catch (error) {
+                console.error("Error fetching doctors:", error);
+                setDoctorsList([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDoctors(); // এই লাইনটি আপনার কোডে মিসিং ছিল, এটি অবশ্যই যোগ করুন!
+    }, []);
     if (loading) return <h2 style={{ textAlign: 'center', marginTop: '50px' }}>Loading Doctors...</h2>;
 
     return (
         <div style={styles.container}>
-            <div 
-                onClick={() => navigate('/')} 
+            <div
+                onClick={() => navigate('/')}
                 style={{ cursor: 'pointer', color: '#0097a7', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '30px', fontWeight: 'bold' }}
             >
                 <FaArrowLeft /> Back to Home
@@ -42,20 +42,20 @@ const Doctors = () => {
 
             <h1 style={{ textAlign: 'center', color: '#333', marginBottom: '40px' }}>Our Expert Doctors</h1>
 
-           {doctorsList.length === 0 ? (
-            <div style={{ textAlign: 'center', marginTop: '50px' }}>
-                <h3>No doctors registered yet.</h3>
-                <p>Please register a doctor to see them here.</p>
-            </div>
+            {doctorsList.length === 0 ? (
+                <div style={{ textAlign: 'center', marginTop: '50px' }}>
+                    <h3>No doctors registered yet.</h3>
+                    <p>Please register a doctor to see them here.</p>
+                </div>
             ) : (
                 doctorsList?.map((doc) => (
                     <div key={doc.id} style={styles.card}>
                         <div style={styles.imgContainer}>
                             {doc.image_url ? (
-                                <img 
-                                    src={doc.image_url} 
-                                    alt={doc.name} 
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                <img
+                                    src={doc.image_url}
+                                    alt={doc.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                 />
                             ) : (
                                 <FaUserMd size={80} color="#adb5bd" />
@@ -64,7 +64,7 @@ const Doctors = () => {
 
                         <div style={{ flex: 1 }}>
                             <h2 style={{ color: '#0097a7', margin: '0 0 10px 0' }}>{doc.name}</h2>
-                            
+
                             {/* Qualification দেখানোর জন্য নতুন লাইন */}
                             <p style={{ margin: '5px 0', fontSize: '16px', color: '#333' }}>
                                 <b>{doc.qualifications || 'MBBS'}</b>
@@ -82,10 +82,10 @@ const Doctors = () => {
                             </p>
 
                             <div style={styles.btnGroup}>
-                                <button 
-                                    style={styles.primaryBtn} 
-                                    onClick={() => navigate('/login', { 
-                                        state: { from: '/appointment', doctorName: doc.name, role: 'Patient' } 
+                                <button
+                                    style={styles.primaryBtn}
+                                    onClick={() => navigate('/appointment', {
+                                        state: { doctorName: doc.name, doctorId: doc.id }
                                     })}
                                 >
                                     <FaCalendarCheck /> Appointment
