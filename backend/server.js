@@ -27,10 +27,10 @@ const upload = multer({ storage: storage });
 app.get('/users', async (req, res) => {
   try {
     const allUsers = await pool.query("SELECT * FROM users");
-    res.json(allUsers.rows);
+    return res.json(allUsers.rows);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send("Server Error");
+    return res.status(500).send("Server Error");
   }
 });
 
@@ -97,9 +97,9 @@ app.get('/api/pending-appointments', async (req, res) => {
              WHERE a.status = 'Pending'
              ORDER BY a.appointment_date ASC`
         );
-        res.json(result.rows);
+        return res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: "Database error" });
+        return res.status(500).json({ error: "Database error" });
     }
 });
 // নির্দিষ্ট ডক্টরের শিডিউল দেখার জন্য এপিআই
@@ -113,10 +113,10 @@ app.get('/api/doctor-availability/:id', async (req, res) => {
              ORDER BY date ASC`, 
             [id]
         );
-        res.json(result.rows);
+        return res.json(result.rows);
     } catch (err) {
         console.error("Schedule Error:", err.message);
-        res.status(500).json({ error: "Failed to fetch schedule" });
+        return res.status(500).json({ error: "Failed to fetch schedule" });
     }
 });
 // ৩. একাউন্ট ক্রিয়েশন (রিসেপশনিস্ট টেবিল হ্যান্ডলিং সহ)
@@ -182,21 +182,7 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
         client.release();
     }
 });
-app.put('/api/confirm-appointment/:id', async (req, res) => {
-    const { id } = req.params;
-    const { receptionist_id } = req.body;
-    try {
-        await pool.query(
-            `UPDATE appointments 
-             SET status = 'Confirmed', receptionists_id = $1 
-             WHERE appointment_id = $2`,
-            [receptionist_id || 2, id] // আইডি ২ ডিফল্ট হিসেবে (কারিম হাসান)
-        );
-        res.json({ success: true, message: "Appointment Confirmed" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+
 
 // ৫. ডক্টর শিডিউল দেখা (রিসেপশনিস্ট এবং পেশেন্টদের জন্য)
 app.get('/api/doctor-schedules', async (req, res) => {
@@ -207,9 +193,9 @@ app.get('/api/doctor-schedules', async (req, res) => {
              JOIN users u ON s.doctor_id = u.user_id 
              WHERE s.IS_ACTIVE = 1`
         );
-        res.json(result.rows);
+        return res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
     }
 });
 // ৮. ডক্টর শিডিউল সেভ করা (DoctorSchedule.js এর জন্য)
@@ -231,15 +217,15 @@ app.post('/api/add-doctor-schedule', async (req, res) => {
 app.get('/api/specializations', async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM specializations ORDER BY specialization_name ASC");
-        res.json(result.rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        return res.json(result.rows);
+    } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/qualifications', async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM qualification ORDER BY qualification_name ASC");
-        res.json(result.rows); 
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        return res.json(result.rows); 
+    } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
 // ৭. লগইন
@@ -253,11 +239,11 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: "Invalid credentials" });
         }
         res.json({ user: { id: result.rows[0].user_id, name: result.rows[0].name, role: result.rows[0].role_name } });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
 
-// সার্চ ডক্টর (পেশেন্ট অ্যাপয়েন্টমেন্টের জন্য)
+// সার্চ ডক্টর (পেশেন্ট অ্যাপয়েন্টমেন্টের জন্য)
 app.get('/api/search-doctors-service', async (req, res) => {
     const { query } = req.query;
     try {
@@ -269,9 +255,9 @@ app.get('/api/search-doctors-service', async (req, res) => {
              WHERE u.name ILIKE $1 OR spec.specialization_name ILIKE $1`,
             [`%${query}%`]
         );
-        res.json(result.rows);
+        return res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
     }
 });
 
@@ -285,10 +271,10 @@ app.put('/api/confirm-appointment/:id', async (req, res) => {
             "UPDATE appointments SET status = 'Confirmed', receptionists_id = $1 WHERE appointment_id = $2",
             [receptionist_id, id]
         );
-        res.json({ success: true });
+        return res.json({ success: true });
     } catch (err) {
         console.error(err.message);
-        res.status(500).json({ error: "DB Error: " + err.message });
+        return res.status(500).json({ error: "DB Error: " + err.message });
     }
 });
 app.get('/api/doctors-list', async (req, res) => {
@@ -305,15 +291,15 @@ app.get('/api/doctors-list', async (req, res) => {
             JOIN users u ON d.user_id = u.user_id
             LEFT JOIN doctor_specialization ds ON d.user_id = ds.doctor_id
             LEFT JOIN specializations s ON ds.specialization_id = s.specialization_id
-            LEFT JOIN doctor_qualification dq ON d.user_id = dq.doctor_id
+            LEFT JOIN qualification_doctor dq ON d.user_id = dq.doctor_id
             LEFT JOIN qualification q ON dq.qualification_id = q.qualification_id
             GROUP BY u.user_id, u.name, d.consultation_fee, d.image_url;
         `;
         const result = await pool.query(query);
-        res.json(result.rows);
+        return res.json(result.rows);
     } catch (err) {
         console.error("Doctor List Error:", err.message);
-        res.status(500).json({ error: "Failed to fetch doctors" });
+        return res.status(500).json({ error: "Failed to fetch doctors" });
     }
 });
 
@@ -322,9 +308,10 @@ app.get('/api/doctors-list', async (req, res) => {
 app.get('/api/medicines', async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM medicines ORDER BY name ASC");
-        res.json(result.rows);
+        return res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Medicine Error:", err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 app.post('/api/buy-medicine', async (req, res) => {
@@ -341,7 +328,7 @@ app.post('/api/buy-medicine', async (req, res) => {
         }
         res.json({ message: "Purchase successful!", data: result.rows[0] });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
     }
 });
 
