@@ -78,7 +78,7 @@ const Doctors = () => {
                             </p>
 
                             <p style={{ margin: '5px 0', color: '#555' }}>
-                                <b>Fees:</b> {doc.fee || '500'} BDT
+                                <b>Fees:</b> {doc.consultation_fee || 'not set'} BDT
                             </p>
 
                             <div style={styles.btnGroup}>
