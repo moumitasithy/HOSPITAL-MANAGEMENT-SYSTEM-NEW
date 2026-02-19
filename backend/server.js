@@ -158,7 +158,7 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
 
             if (qualification && qualification !== "" && qualification !== "undefined") {
                 await client.query(
-                    "INSERT INTO qualification_doctor (qualification_id, doctor_id) VALUES($1, $2)", 
+                    "INSERT INTO doctor_qualification (qualification_id, doctor_id) VALUES($1, $2)", 
                     [parseInt(qualification), userId]
                 );
             }
@@ -291,7 +291,7 @@ app.get('/api/doctors-list', async (req, res) => {
             JOIN users u ON d.user_id = u.user_id
             LEFT JOIN doctor_specialization ds ON d.user_id = ds.doctor_id
             LEFT JOIN specializations s ON ds.specialization_id = s.specialization_id
-            LEFT JOIN qualification_doctor dq ON d.user_id = dq.doctor_id
+            LEFT JOIN doctor_qualification dq ON d.user_id = dq.doctor_id
             LEFT JOIN qualification q ON dq.qualification_id = q.qualification_id
             GROUP BY u.user_id, u.name, d.consultation_fee, d.image_url;
         `;
