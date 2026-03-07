@@ -12,6 +12,8 @@ import Medicines from './pages/Medicines';
 import ReceptionistDashboard from './pages/ReceptionistDashboard';
 import DoctorDashboard from './pages/DoctorDashboard'; 
 import DoctorSchedule from './pages/DoctorSchedule'; 
+import MedicalTests from './pages/MedicalTests';
+import ServePatient from './pages/ServePatient';
 
 // প্রোটেক্টেড রাউট ফাংশন
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -45,6 +47,8 @@ function App() {
         <Route path="/create-account" element={<CreateAccount />} />
         <Route path="/appointment" element={<Appointment />} />
         <Route path="/medicines" element={<Medicines />} />
+        <Route path="/medical-tests" element={<MedicalTests />} />
+        <Route path="/serve-patient" element={<ServePatient />} />
 
         {/* সাধারণ ড্যাশবোর্ড */}
         <Route path="/dashboard" element={<Dashboard />} />

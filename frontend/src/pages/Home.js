@@ -131,6 +131,26 @@ const Home = () => {
                     >
                         Order Medicines
                     </button>
+
+                    <button 
+                        onClick={() => navigate('/medical-tests')} 
+                        style={{
+                            padding: '15px 40px', 
+                            backgroundColor: 'white', 
+                            color: '#0097a7', 
+                            border: '2px solid white', 
+                            borderRadius: '30px', 
+                            fontWeight: 'bold', 
+                            cursor: 'pointer', 
+                            fontSize: '18px',
+                            transition: '0.3s',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)' // বাটনে একটু শ্যাডো যোগ করলে আরও সুন্দর লাগবে
+                        }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#e0f2f1'} // হোভার ইফেক্ট
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                    >
+                        Medical Tests
+                    </button>
                 </div>
             </div>
         </div>

@@ -332,6 +332,18 @@ app.post('/api/buy-medicine', async (req, res) => {
     }
 });
 
+
+// Medical Tests list poyar API
+app.get('/api/test_details', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT * FROM test_details ORDER BY test_id ASC");
+        res.json(result.rows); // result.rows একটি অ্যারে পাঠায়
+    } catch (err) {
+        res.status(500).json([]); // এরর হলে খালি অ্যারে পাঠান
+    }
+});
+
+
 // স্পেশালাইজেশন লিস্ট পাওয়ার এপিআই
 
 
