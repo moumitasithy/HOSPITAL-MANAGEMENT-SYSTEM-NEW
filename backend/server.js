@@ -5,7 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const app = express();
-
+const bcrypt = require('bcrypt');
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -82,7 +82,7 @@ app.post('/api/book-appointment-full', async (req, res) => {
 
 // ২. পেন্ডিং অ্যাপয়েন্টমেন্ট লিস্ট (রিসেপশনিস্ট ড্যাশবোর্ডের জন্য)
 
-// server.js এর এই অংশটি পরিবর্তন করুন
+
 app.get('/api/pending-appointments', async (req, res) => {
     try {
         const result = await pool.query(
@@ -129,6 +129,9 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
             name, email, phone_number, password, role, 
             consultation_fee, qualification, specialization 
         } = req.body;
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
         
         const image_url = req.file ? `http://localhost:5000/uploads/${req.file.filename}` : null;
 
@@ -137,38 +140,48 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
         const roleId = roleRes.rows[0].role_id;
 
         const userRes = await client.query(
-            "INSERT INTO users (name, email, phone_number, password, role_id) VALUES($1, $2, $3, $4, $5) RETURNING user_id",
-            [name, email, phone_number, password, roleId]
+           "INSERT INTO users (name, email, phone_number, password, role_id) VALUES($1, $2, $3, $4, $5) RETURNING user_id",
+            [name, email, phone_number, hashedPassword, roleId]
         );
         const userId = userRes.rows[0].user_id;
 
-        // যদি রোল 'Doctor' হয়
         if (role === 'Doctor') {
             await client.query(
                 "INSERT INTO doctors (user_id, consultation_fee, image_url) VALUES($1, $2, $3)",
                 [userId, consultation_fee, image_url]
             );
 
-            if (specialization && specialization !== "" && specialization !== "undefined") {
-                await client.query(
-                    "INSERT INTO doctor_specialization (specialization_id, doctor_id) VALUES($1, $2)", 
-                    [parseInt(specialization), userId]
-                );
+            // --- স্পেশালাইজেশন হ্যান্ডেল করা (Multiple) ---
+            if (specialization && specialization !== "undefined") {
+                // FormData থেকে আসা স্ট্রিং-কে অ্যারেতে রূপান্তর
+                const specIds = typeof specialization === 'string' ? JSON.parse(specialization) : specialization;
+                
+                if (Array.isArray(specIds)) {
+                    for (const s_id of specIds) {
+                        await client.query(
+                            "INSERT INTO doctor_specialization (specialization_id, doctor_id) VALUES($1, $2)", 
+                            [parseInt(s_id), userId]
+                        );
+                    }
+                }
             }
 
-            if (qualification && qualification !== "" && qualification !== "undefined") {
-                await client.query(
-                    "INSERT INTO doctor_qualification (qualification_id, doctor_id) VALUES($1, $2)", 
-                    [parseInt(qualification), userId]
-                );
+            // --- কোয়ালিফিকেশন হ্যান্ডেল করা (Multiple) ---
+            if (qualification && qualification !== "undefined") {
+                const qualIds = typeof qualification === 'string' ? JSON.parse(qualification) : qualification;
+                
+                if (Array.isArray(qualIds)) {
+                    for (const q_id of qualIds) {
+                        await client.query(
+                            "INSERT INTO doctor_qualification (qualification_id, doctor_id) VALUES($1, $2)", 
+                            [parseInt(q_id), userId]
+                        );
+                    }
+                }
             }
         } 
-        // যদি রোল 'Receptionist' হয় (রিসেপশনিস্ট টেবিলে ইনসার্ট)
         else if (role === 'Receptionist') {
-            await client.query(
-                "INSERT INTO receptionists (user_id) VALUES($1)",
-                [userId]
-            );
+            await client.query("INSERT INTO receptionists (user_id) VALUES($1)", [userId]);
         }
 
         await client.query('COMMIT');
@@ -183,6 +196,33 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
     }
 });
 
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const userRes = await pool.query(
+            "SELECT u.*, r.role_name FROM users u JOIN roles r ON u.role_id = r.role_id WHERE u.email = $1", 
+            [email]
+        );
+
+        if (userRes.rows.length === 0) {
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        const user = userRes.rows[0];
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        res.json({
+            success: true,
+            user: { id: user.user_id, name: user.name, role: user.role_name }
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Server error" });
+    }
+});
 
 // ৫. ডক্টর শিডিউল দেখা (রিসেপশনিস্ট এবং পেশেন্টদের জন্য)
 app.get('/api/doctor-schedules', async (req, res) => {
@@ -198,85 +238,7 @@ app.get('/api/doctor-schedules', async (req, res) => {
         return res.status(500).json({ error: err.message });
     }
 });
-// ৮. ডক্টর শিডিউল সেভ করা (DoctorSchedule.js এর জন্য)
-app.post('/api/add-doctor-schedule', async (req, res) => {
-    const { doctor_id, date, day, hours_start, hours_end, details } = req.body;
-    try {
-        const result = await pool.query(
-            `INSERT INTO schedules (doctor_id, date, day, hours_start, hours_end, details, is_active) 
-             VALUES ($1, $2, $3, $4, $5, $6, 1) RETURNING *`, 
-            [doctor_id, date, day, hours_start, hours_end, details]
-        );
-        res.status(201).json({ success: true, message: "Schedule Saved!", data: result.rows[0] });
-    } catch (err) {
-        console.error("Save Schedule Error:", err.message);
-        res.status(500).json({ error: err.message });
-    }
-});
-// ৬. ড্রপডাউন ডাটা (Specializations & Qualifications)
-app.get('/api/specializations', async (req, res) => {
-    try {
-        const result = await pool.query("SELECT * FROM specializations ORDER BY specialization_name ASC");
-        return res.json(result.rows);
-    } catch (err) { return res.status(500).json({ error: err.message }); }
-});
 
-app.get('/api/qualifications', async (req, res) => {
-    try {
-        const result = await pool.query("SELECT * FROM qualification ORDER BY qualification_name ASC");
-        return res.json(result.rows); 
-    } catch (err) { return res.status(500).json({ error: err.message }); }
-});
-
-// ৭. লগইন
-app.post('/api/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        const result = await pool.query(
-            "SELECT u.*, r.role_name FROM users u JOIN roles r ON u.role_id = r.role_id WHERE u.email = $1", [email]
-        );
-        if (result.rows.length === 0 || result.rows[0].password !== password) {
-            return res.status(401).json({ error: "Invalid credentials" });
-        }
-        res.json({ user: { id: result.rows[0].user_id, name: result.rows[0].name, role: result.rows[0].role_name } });
-    } catch (err) { return res.status(500).json({ error: err.message }); }
-});
-
-
-// সার্চ ডক্টর (পেশেন্ট অ্যাপয়েন্টমেন্টের জন্য)
-app.get('/api/search-doctors-service', async (req, res) => {
-    const { query } = req.query;
-    try {
-        const result = await pool.query(
-            `SELECT u.user_id, u.name, spec.specialization_name 
-             FROM users u
-             JOIN doctor_specialization d_spec ON u.user_id = d_spec.doctor_id
-             JOIN specializations spec ON d_spec.specialization_id = spec.specialization_id
-             WHERE u.name ILIKE $1 OR spec.specialization_name ILIKE $1`,
-            [`%${query}%`]
-        );
-        return res.json(result.rows);
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
-    }
-});
-
-// কনফার্ম অ্যাপয়েন্টমেন্ট
-app.put('/api/confirm-appointment/:id', async (req, res) => {
-    const { id } = req.params;
-    const { receptionist_id } = req.body; // ফ্রন্টএন্ড থেকে আসা ৫
-
-    try {
-        const result = await pool.query(
-            "UPDATE appointments SET status = 'Confirmed', receptionists_id = $1 WHERE appointment_id = $2",
-            [receptionist_id, id]
-        );
-        return res.json({ success: true });
-    } catch (err) {
-        console.error(err.message);
-        return res.status(500).json({ error: "DB Error: " + err.message });
-    }
-});
 app.get('/api/doctors-list', async (req, res) => {
     try {
         const query = `
@@ -302,7 +264,87 @@ app.get('/api/doctors-list', async (req, res) => {
         return res.status(500).json({ error: "Failed to fetch doctors" });
     }
 });
+app.post('/api/add-bulk-schedule', async (req, res) => {
+    const { doctor_id, startDate, endDate, selectedDays, hours_start, hours_end } = req.body;
+    
+    // ১. চেক করুন ইনপুট ডাটা ঠিকমতো আসছে কি না
+    console.log("--- DEBUG START ---");
+    console.log("Doctor ID:", doctor_id);
+    console.log("Date Range:", startDate, "to", endDate);
+    console.log("Selected Days:", selectedDays);
 
+    const daysMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+    const selectedIndexes = selectedDays.map(d => daysMap[d]);
+
+    let current = new Date(startDate + "T00:00:00");
+    const last = new Date(endDate + "T00:00:00");
+
+    let matchFound = 0;
+    let insertCount = 0;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        while (current <= last) {
+            if (selectedIndexes.includes(current.getDay())) {
+                matchFound++; // চেক করছি লুপের ভেতর দিন ম্যাচ করছে কি না
+                
+                const dateStr = current.toISOString().split('T')[0];
+                
+                const result = await client.query(
+                    `INSERT INTO schedules (doctor_id, date, day, hours_start, hours_end, is_active)
+                     VALUES ($1, $2, $3, $4, $5, 1)
+                     ON CONFLICT (doctor_id, date) DO NOTHING
+                     RETURNING *`,
+                    [doctor_id, dateStr, selectedDays.find(d => daysMap[d] === current.getDay()), hours_start, hours_end]
+                );
+
+                if (result.rowCount > 0) {
+                    insertCount++;
+                } else {
+                    console.log(`Skipped (Already Exists): ${dateStr}`);
+                }
+            }
+            current.setDate(current.getDate() + 1);
+        }
+
+        await client.query('COMMIT');
+        
+        console.log("Matches Found in Loop:", matchFound);
+        console.log("Successfully Inserted:", insertCount);
+        console.log("--- DEBUG END ---");
+
+        res.json({ 
+            success: true, 
+            message: insertCount > 0 ? `${insertCount} days saved!` : `0 days saved. (Matches: ${matchFound}, check terminal)` 
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("DB ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
+// কনফার্ম অ্যাপয়েন্টমেন্ট
+app.put('/api/confirm-appointment/:id', async (req, res) => {
+    const { id } = req.params;
+    const { receptionist_id } = req.body; // ফ্রন্টএন্ড থেকে আসা ৫
+
+    try {
+        const result = await pool.query(
+            "UPDATE appointments SET status = 'Confirmed', receptionists_id = $1 WHERE appointment_id = $2",
+            [receptionist_id, id]
+        );
+        return res.json({ success: true });
+    } catch (err) {
+        console.error(err.message);
+        return res.status(500).json({ error: "DB Error: " + err.message });
+    }
+});
 
 // মেডিসিন এপিআই
 app.get('/api/medicines', async (req, res) => {
@@ -331,6 +373,20 @@ app.post('/api/buy-medicine', async (req, res) => {
         return res.status(500).json({ error: err.message });
     }
 });
+ //ড্রপডাউন ডাটা (Specializations & Qualifications)
+app.get('/api/specializations', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT * FROM specializations ORDER BY specialization_name ASC");
+        return res.json(result.rows);
+    } catch (err) { return res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/qualifications', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT * FROM qualification ORDER BY qualification_name ASC");
+        return res.json(result.rows); 
+    } catch (err) { return res.status(500).json({ error: err.message }); }
+});
 
 
 // Medical Tests list poyar API
@@ -343,7 +399,50 @@ app.get('/api/test_details', async (req, res) => {
     }
 });
 
+// সার্চ ডক্টর (পেশেন্ট অ্যাপয়েন্টমেন্টের জন্য)
+app.get('/api/search-doctors-service', async (req, res) => {
+    const { query } = req.query;
+    try {
+        const result = await pool.query(
+            `SELECT u.user_id, u.name, spec.specialization_name 
+             FROM users u
+             JOIN doctor_specialization d_spec ON u.user_id = d_spec.doctor_id
+             JOIN specializations spec ON d_spec.specialization_id = spec.specialization_id
+             WHERE u.name ILIKE $1 OR spec.specialization_name ILIKE $1`,
+            [`%${query}%`]
+        );
+        return res.json(result.rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
 
+// ১. নির্দিষ্ট ডাক্তারের সব শিডিউল গেট করা
+app.get('/api/doctor-manage-schedules/:id', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT * FROM schedules WHERE doctor_id = $1 ORDER BY date ASC", 
+            [req.params.id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ২. শিডিউল স্ট্যাটাস (Active/Inactive) আপডেট করা
+app.put('/api/update-schedule-status', async (req, res) => {
+    const { schedule_id, is_active } = req.body;
+    try {
+        await pool.query(
+            "UPDATE schedules SET is_active = $1 WHERE schedule_id = $2",
+            [is_active, schedule_id]
+        );
+        res.json({ success: true, message: "Status updated successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 // স্পেশালাইজেশন লিস্ট পাওয়ার এপিআই
 
 

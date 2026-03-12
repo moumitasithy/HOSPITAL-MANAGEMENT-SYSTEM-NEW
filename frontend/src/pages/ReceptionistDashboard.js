@@ -26,7 +26,6 @@ const ReceptionistDashboard = () => {
         }
     };
 
-    // ডাক্তারের শিডিউল দেখার ফাংশন - doctor_id সরাসরি ব্যবহার করা হয়েছে
     const handleSeeSchedule = async (doctorId) => {
         if (!doctorId) {
             return alert("Doctor ID not found for this appointment");
@@ -41,35 +40,31 @@ const ReceptionistDashboard = () => {
             alert("Could not load doctor schedule");
         }
     };
-const handleConfirm = async (apptId) => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    
-    // কনসোলে চেক করে নিন আইডি ৫ আসছে কি না
-    console.log("Logged in user data:", user);
 
-    // আপনার অবজেক্টে যদি user_id না থাকে তবে শুধু id ট্রাই করুন
-    const ridwanId = user?.user_id || user?.id; 
+    const handleConfirm = async (apptId) => {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const ridwanId = user?.user_id || user?.id; 
 
-    if (!ridwanId) return alert("User ID not found. Please logout and login again.");
+        if (!ridwanId) return alert("User ID not found. Please logout and login again.");
 
-    try {
-        const res = await fetch(`http://localhost:5000/api/confirm-appointment/${apptId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ receptionist_id: ridwanId }) // আইডি পাঠানো হচ্ছে
-        });
+        try {
+            const res = await fetch(`http://localhost:5000/api/confirm-appointment/${apptId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ receptionist_id: ridwanId }) 
+            });
 
-        if (res.ok) {
-            alert("Success!");
-            fetchAppointments();
-        } else {
-            const errData = await res.json();
-            alert("Error: " + errData.error);
+            if (res.ok) {
+                alert("Success!");
+                fetchAppointments();
+            } else {
+                const errData = await res.json();
+                alert("Error: " + errData.error);
+            }
+        } catch (err) {
+            alert("Server failed!");
         }
-    } catch (err) {
-        alert("Server failed!");
-    }
-};
+    };
     
     const handleLogout = () => {
         localStorage.removeItem('user');
@@ -137,7 +132,7 @@ const handleConfirm = async (apptId) => {
                                     <td style={{ padding: '12px' }}>{app.phone_number}</td>
                                     <td style={{ padding: '12px' }}><strong>Dr. {app.doctor_name}</strong></td>
                                     <td style={{ padding: '12px' }}>
-                                        {new Date(app.appointment_date).toLocaleDateString()}<br/>
+                                        {new Date(app.appointment_date).toLocaleDateString('en-GB')}<br/>
                                         <small style={{ color: '#666' }}>{app.appointment_time}</small>
                                     </td>
                                     <td style={{ padding: '12px' }}>
@@ -167,6 +162,7 @@ const handleConfirm = async (apptId) => {
                 )}
             </div>
 
+            {/* মডাল যেখানে তারিখ যোগ করা হয়েছে */}
             {showModal && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalContent}>
@@ -177,6 +173,11 @@ const handleConfirm = async (apptId) => {
                             {selectedDoctorSchedule && selectedDoctorSchedule.length > 0 ? (
                                 selectedDoctorSchedule.map((s, index) => (
                                     <div key={index} style={{ padding: '10px', backgroundColor: '#f9f9f9', marginBottom: '8px', borderRadius: '4px', borderLeft: '4px solid #00796b' }}>
+                                        {/* তারিখটি এখানে দেখানো হচ্ছে */}
+                                        <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '14px' }}>
+                                            {new Date(s.date).toLocaleDateString('en-GB')}
+                                        </span>
+                                        <br/>
                                         <strong>{s.day}</strong><br/>
                                         <span>{s.hours_start} - {s.hours_end}</span>
                                     </div>

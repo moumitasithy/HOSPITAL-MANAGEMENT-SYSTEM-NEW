@@ -1,17 +1,18 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// পেজগুলো ইমপোর্ট করা হচ্ছে - নিশ্চিত করুন ফাইলের নাম এবং পাথ সঠিক আছে
+// পেজগুলো ইমপোর্ট করা হচ্ছে
 import Home from './pages/Home';
 import Doctors from './pages/Doctor';
 import Login from './pages/login'; 
-import CreateAccount from './pages/createaccount'; // নিশ্চিত করুন ফাইলে export default আছে
+import CreateAccount from './pages/createaccount'; 
 import Dashboard from './pages/dashboard';
 import Appointment from './pages/appoinment';
 import Medicines from './pages/Medicines';
 import ReceptionistDashboard from './pages/ReceptionistDashboard';
 import DoctorDashboard from './pages/DoctorDashboard'; 
 import DoctorSchedule from './pages/DoctorSchedule'; 
+import ManageSchedule from './pages/ManageSchedule'; // <--- এই ইমপোর্টটি বাদ পড়েছিল
 import MedicalTests from './pages/MedicalTests';
 import ServePatient from './pages/ServePatient';
 
@@ -19,13 +20,13 @@ import ServePatient from './pages/ServePatient';
 const ProtectedRoute = ({ children, allowedRole }) => {
     const userString = localStorage.getItem('user');
     
-    // ইউজার ডাটা না থাকলে সরাসরি লগইন-এ পাঠিয়ে দেবে
     if (!userString) {
         return <Navigate to="/login" />;
     }
 
     try {
         const user = JSON.parse(userString);
+        // ইউজারের রোল যদি অনুমোদিত রোলের সাথে না মিলে তবে লগইনে পাঠাবে
         if (user.role !== allowedRole) {
             return <Navigate to="/login" />;
         }
@@ -48,8 +49,7 @@ function App() {
         <Route path="/appointment" element={<Appointment />} />
         <Route path="/medicines" element={<Medicines />} />
         <Route path="/medical-tests" element={<MedicalTests />} />
-        <Route path="/serve-patient" element={<ServePatient />} />
-
+        
         {/* সাধারণ ড্যাশবোর্ড */}
         <Route path="/dashboard" element={<Dashboard />} />
 
@@ -63,7 +63,7 @@ function App() {
           } 
         />
 
-        {/* ২. ডাক্তার ড্যাশবোর্ড */}
+        {/* ২. ডাক্তার ড্যাশবোর্ড ও সংশ্লিষ্ট পেজগুলো (সবগুলো প্রোটেক্টেড করা হয়েছে) */}
         <Route 
           path="/doctor-dashboard" 
           element={
@@ -73,12 +73,30 @@ function App() {
           } 
         />
 
-        {/* ৩. ডাক্তার শিডিউল পেজ */}
         <Route 
           path="/doctor-schedule" 
           element={
             <ProtectedRoute allowedRole="Doctor">
               <DoctorSchedule />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* এই রাউটটি এখন ডাক্তারের জন্য সুরক্ষিত */}
+        <Route 
+          path="/manage-schedule" 
+          element={
+            <ProtectedRoute allowedRole="Doctor">
+              <ManageSchedule />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/serve-patient" 
+          element={
+            <ProtectedRoute allowedRole="Doctor">
+              <ServePatient />
             </ProtectedRoute>
           } 
         />

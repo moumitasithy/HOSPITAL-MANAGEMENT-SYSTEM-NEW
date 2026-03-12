@@ -31,7 +31,7 @@ const pool = new Pool({
   user: 'postgres', 
   host: 'localhost',
   database: 'Hospital_Management_System', 
-  password: 'sjt05lara!', 
+  password: '123111232', 
   port: 5432,
   max: 50, // আপনি এটি চাচ্ছেন
   idleTimeoutMillis: 30000, 
