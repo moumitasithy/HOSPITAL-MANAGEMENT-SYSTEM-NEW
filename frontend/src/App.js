@@ -101,12 +101,14 @@ function App() {
           } 
         />
 
+
+
         {/* ভুল ইউআরএল দিলে হোমে ব্যাক করবে */}
         <Route path="*" element={<Navigate to="/" />} />
 
       </Routes>
     </Router>
-  );
+  )
 }
 
 export default App;

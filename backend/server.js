@@ -33,73 +33,57 @@ app.get('/users', async (req, res) => {
     return res.status(500).send("Server Error");
   }
 });
-
-app.post('/api/book-appointment-full', async (req, res) => {
+app.post('/api/book-appointment', async (req, res) => {
     const { 
-        name, phone_number, email, age, gender, blood_group, patient_type,
-        date, appointment_time, doctorId 
+        name, phone_number, email, age, gender, 
+        date, appointment_time, doctor_id 
     } = req.body;
 
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN');
-
-        const patientRes = await client.query(
-            `INSERT INTO patients (name, phone_number, email, age, gender, blood_group, patient_type) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7) 
-             ON CONFLICT (email) DO UPDATE SET phone_number = EXCLUDED.phone_number 
-             RETURNING patient_id`,
-            [name, phone_number, email, age, gender, blood_group, patient_type || 'Out-patient']
-        );
-        const patientId = patientRes.rows[0].patient_id;
-
-        const serviceRes = await client.query(
-            'INSERT INTO service (patient_id) VALUES ($1) RETURNING service_id',
-            [patientId]
-        );
-        const serviceId = serviceRes.rows[0].service_id;
-
-        await client.query(
-            'INSERT INTO doctor_serves (user_id, service_id) VALUES ($1, $2)',
-            [doctorId, serviceId]
+        // নতুন প্রসিডিউর কল করা হচ্ছে (v3)
+        // এই প্রসিডিউরটি patients এবং appointments টেবিলে ডাটা ইনসার্ট করবে
+        await pool.query(
+            'CALL book_appointment_v3($1, $2, $3, $4, $5, $6, $7, $8)',
+            [name, phone_number, email, age, gender, date, appointment_time, doctor_id]
         );
 
-        await client.query(
-            `INSERT INTO appointments (appointment_date, appointment_time, service_id, status) 
-             VALUES ($1, $2, $3, 'Pending')`,
-            [date, appointment_time, serviceId] 
-        );
-
-        await client.query('COMMIT');
-        res.status(200).json({ success: true, message: "Appointment booked successfully!" });
+        res.status(200).json({ 
+            success: true, 
+            message: "Appointment request sent to receptionist!" 
+        });
     } catch (err) {
-        await client.query('ROLLBACK');
-        res.status(500).json({ error: err.message });
-    } finally {
-        client.release();
+        console.error("Booking Error:", err.message);
+        res.status(500).json({ 
+            success: false, 
+            error: "Internal Server Error. Please try again." 
+        });
     }
 });
-
 // ২. পেন্ডিং অ্যাপয়েন্টমেন্ট লিস্ট (রিসেপশনিস্ট ড্যাশবোর্ডের জন্য)
-
 
 app.get('/api/pending-appointments', async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT a.appointment_id, a.appointment_date, a.appointment_time, 
-                    p.name as patient_name, p.phone_number, 
-                    u.name as doctor_name, u.user_id as doctor_id 
+            `SELECT 
+                a.appointment_id, 
+                a.appointment_date, 
+                a.appointment_time, 
+                a.status,
+                p.name as patient_name, 
+                p.phone_number as patient_phone, 
+                u.name as doctor_name, 
+                u.user_id as doctor_id 
              FROM appointments a
-             JOIN service s ON a.service_id = s.service_id
-             JOIN patients p ON s.patient_id = p.patient_id
-             JOIN doctor_serves ds ON s.service_id = ds.service_id
-             JOIN users u ON ds.user_id = u.user_id
+             JOIN patients p ON a.patient_id = p.patient_id
+             JOIN users u ON a.doctor_id = u.user_id
              WHERE a.status = 'Pending'
-             ORDER BY a.appointment_date ASC`
+             ORDER BY a.appointment_date ASC, a.appointment_time ASC`
         );
+        
         return res.json(result.rows);
     } catch (err) {
-        return res.status(500).json({ error: "Database error" });
+        console.error("Fetch Pending Error:", err.message);
+        return res.status(500).json({ error: "Database error while fetching pending appointments" });
     }
 });
 // নির্দিষ্ট ডক্টরের শিডিউল দেখার জন্য এপিআই
@@ -121,78 +105,36 @@ app.get('/api/doctor-availability/:id', async (req, res) => {
 });
 // ৩. একাউন্ট ক্রিয়েশন (রিসেপশনিস্ট টেবিল হ্যান্ডলিং সহ)
 app.post('/api/createaccount', upload.single('image'), async (req, res) => {
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN');
-        
         const { 
             name, email, phone_number, password, role, 
             consultation_fee, qualification, specialization 
         } = req.body;
 
+        // পাসওয়ার্ড হ্যাশ করা
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
         
         const image_url = req.file ? `http://localhost:5000/uploads/${req.file.filename}` : null;
 
-        const roleRes = await client.query("SELECT role_id FROM roles WHERE role_name = $1", [role]);
-        if (roleRes.rows.length === 0) throw new Error("Role not found");
-        const roleId = roleRes.rows[0].role_id;
+        // স্ট্রিং থেকে অ্যারেতে রূপান্তর (FormData হ্যান্ডেল করার জন্য)
+        const specIds = specialization ? JSON.parse(specialization).map(Number) : [];
+        const qualIds = qualification ? JSON.parse(qualification).map(Number) : [];
 
-        const userRes = await client.query(
-           "INSERT INTO users (name, email, phone_number, password, role_id) VALUES($1, $2, $3, $4, $5) RETURNING user_id",
-            [name, email, phone_number, hashedPassword, roleId]
+        // সরাসরি প্রসিডিউর কল করা
+        await pool.query(
+            "CALL create_account($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            [
+                name, email, phone_number, hashedPassword, role, 
+                consultation_fee || 0, image_url, specIds, qualIds
+            ]
         );
-        const userId = userRes.rows[0].user_id;
 
-        if (role === 'Doctor') {
-            await client.query(
-                "INSERT INTO doctors (user_id, consultation_fee, image_url) VALUES($1, $2, $3)",
-                [userId, consultation_fee, image_url]
-            );
-
-            // --- স্পেশালাইজেশন হ্যান্ডেল করা (Multiple) ---
-            if (specialization && specialization !== "undefined") {
-                // FormData থেকে আসা স্ট্রিং-কে অ্যারেতে রূপান্তর
-                const specIds = typeof specialization === 'string' ? JSON.parse(specialization) : specialization;
-                
-                if (Array.isArray(specIds)) {
-                    for (const s_id of specIds) {
-                        await client.query(
-                            "INSERT INTO doctor_specialization (specialization_id, doctor_id) VALUES($1, $2)", 
-                            [parseInt(s_id), userId]
-                        );
-                    }
-                }
-            }
-
-            // --- কোয়ালিফিকেশন হ্যান্ডেল করা (Multiple) ---
-            if (qualification && qualification !== "undefined") {
-                const qualIds = typeof qualification === 'string' ? JSON.parse(qualification) : qualification;
-                
-                if (Array.isArray(qualIds)) {
-                    for (const q_id of qualIds) {
-                        await client.query(
-                            "INSERT INTO doctor_qualification (qualification_id, doctor_id) VALUES($1, $2)", 
-                            [parseInt(q_id), userId]
-                        );
-                    }
-                }
-            }
-        } 
-        else if (role === 'Receptionist') {
-            await client.query("INSERT INTO receptionists (user_id) VALUES($1)", [userId]);
-        }
-
-        await client.query('COMMIT');
-        res.status(201).json({ success: true, message: "Account created successfully" });
+        res.status(201).json({ success: true, message: "Account created successfully via Procedure" });
         
     } catch (err) {
-        await client.query('ROLLBACK');
         console.error("Signup Error:", err.message);
         res.status(500).json({ error: "Failed: " + err.message });
-    } finally {
-        client.release();
     }
 });
 
@@ -329,22 +271,6 @@ app.post('/api/add-bulk-schedule', async (req, res) => {
     }
 });
 
-// কনফার্ম অ্যাপয়েন্টমেন্ট
-app.put('/api/confirm-appointment/:id', async (req, res) => {
-    const { id } = req.params;
-    const { receptionist_id } = req.body; // ফ্রন্টএন্ড থেকে আসা ৫
-
-    try {
-        const result = await pool.query(
-            "UPDATE appointments SET status = 'Confirmed', receptionists_id = $1 WHERE appointment_id = $2",
-            [receptionist_id, id]
-        );
-        return res.json({ success: true });
-    } catch (err) {
-        console.error(err.message);
-        return res.status(500).json({ error: "DB Error: " + err.message });
-    }
-});
 
 // মেডিসিন এপিআই
 app.get('/api/medicines', async (req, res) => {
@@ -399,7 +325,6 @@ app.get('/api/test_details', async (req, res) => {
     }
 });
 
-// সার্চ ডক্টর (পেশেন্ট অ্যাপয়েন্টমেন্টের জন্য)
 app.get('/api/search-doctors-service', async (req, res) => {
     const { query } = req.query;
     try {
@@ -409,11 +334,11 @@ app.get('/api/search-doctors-service', async (req, res) => {
              JOIN doctor_specialization d_spec ON u.user_id = d_spec.doctor_id
              JOIN specializations spec ON d_spec.specialization_id = spec.specialization_id
              WHERE u.name ILIKE $1 OR spec.specialization_name ILIKE $1`,
-            [`%${query}%`]
+            [`%${query || ''}%`]
         );
-        return res.json(result.rows);
+        res.json(result.rows);
     } catch (err) {
-        return res.status(500).json({ error: err.message });
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -443,12 +368,59 @@ app.put('/api/update-schedule-status', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-// স্পেশালাইজেশন লিস্ট পাওয়ার এপিআই
+// ১. টোটাল সার্ভড সংখ্যা (যেটা আপনি দিয়েছেন)
 
+/*app.get('/api/doctor-appointment-counts/:id', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                appointment_date::DATE as appointment_date, 
+                COUNT(*)::INT as daily_count 
+            FROM appointments a
+            JOIN service s ON a.service_id = s.service_id
+            JOIN doctor_serves ds ON s.service_id = ds.service_id
+            WHERE ds.user_id = $1
+            GROUP BY appointment_date::DATE
+            ORDER BY appointment_date DESC`, 
+            [req.params.id]
+        );
+        console.log("Data for ID " + req.params.id + ":", result.rows);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send(err.message);
+    }
+});*/
 
-// কোয়ালিফিকেশন লিস্ট পাওয়ার এপিআই
-// এই কোডটি server.js এ আপডেট করুন
-// server.js এর ভেতরে
-
+app.delete('/api/delete-user/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query("DELETE FROM users WHERE user_id = $1", [id]);
+        res.json({ success: true, message: "User and all related profiles deleted successfully!" });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Failed to delete user: " + err.message });
+    }
+});
+// ১. ক্যানসেল এপিআই
+app.delete('/api/cancel-appointment/:id', async (req, res) => {
+    try {
+        await pool.query('CALL cancel_appointment_v3($1)', [req.params.id]);
+        res.json({ success: true, message: "Deleted and Archived!" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+app.put('/api/confirm-appointment/:id', async (req, res) => {
+    const { receptionist_id } = req.body;
+    try {
+        await pool.query('CALL confirm_appointment_v3($1, $2)', [req.params.id, receptionist_id]);
+        res.json({ success: true, message: "Appointment Confirmed!" });
+    } catch (err) {
+        // ডাটাবেসের RAISE EXCEPTION এখানে ক্যাচ হবে
+        console.error(err.message);
+        res.status(400).json({ error: err.message }); 
+    }
+});
 
 app.listen(5000, () => { console.log("Server running on port 5000"); });

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaCalendarCheck, FaEye, FaSignOutAlt, FaUserMd } from 'react-icons/fa';
+import { FaCalendarCheck, FaEye, FaSignOutAlt, FaUserMd, FaTimesCircle } from 'react-icons/fa';
 import bgImage from '../assets/Receptionist_schedule.jpg';
 
 const ReceptionistDashboard = () => {
@@ -41,31 +41,57 @@ const ReceptionistDashboard = () => {
         }
     };
 
-    const handleConfirm = async (apptId) => {
-        const user = JSON.parse(localStorage.getItem('user'));
-        const ridwanId = user?.user_id || user?.id; 
+    const user = JSON.parse(localStorage.getItem('user')); // আপনার লগইন লজিক অনুযায়ী কি (key) পরিবর্তন হতে পারে
+const currentUserId = user ? user.id : null;
+const handleConfirm = async (appointmentId) => {
+    if (!currentUserId) {
+        alert("Please log in again.");
+        return;
+    }
+    try {
+        const response = await fetch(`http://localhost:5000/api/confirm-appointment/${appointmentId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receptionist_id: currentUserId }) 
+        });
 
-        if (!ridwanId) return alert("User ID not found. Please logout and login again.");
+        const data = await response.json();
 
-        try {
-            const res = await fetch(`http://localhost:5000/api/confirm-appointment/${apptId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ receptionist_id: ridwanId }) 
-            });
-
-            if (res.ok) {
-                alert("Success!");
-                fetchAppointments();
-            } else {
-                const errData = await res.json();
-                alert("Error: " + errData.error);
-            }
-        } catch (err) {
-            alert("Server failed!");
+        if (!response.ok) {
+            // যদি ডাটাবেস থেকে Limit Exceeded এরর আসে
+            alert(data.error || "Limit exceeded! Please cancel this request.");
+            return;
         }
-    };
-    
+
+        alert("Appointment Confirmed Successfully!");
+        // টেবিল রিফ্রেশ করার লজিক এখানে লিখুন
+    } catch (err) {
+        console.error("Error:", err);
+        alert("Something went wrong!");
+    }
+};
+    // আপনার বর্তমান handleCancel ফাংশনটি একদম ঠিক আছে। 
+// শুধু নিশ্চিত করুন আপনার ব্যাকএন্ডে CALL cancel_appointment_final($1) ব্যবহার করা হয়েছে।
+const handleCancel = async (appointmentId) => {
+    if (window.confirm("Are you sure you want to cancel and delete this appointment? It will be archived.")) {
+        try {
+            const response = await fetch(`http://localhost:5000/api/cancel-appointment/${appointmentId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (data.success) {
+                alert(data.message);
+                fetchAppointments(); // ডাটা ডিলিট হওয়ার পর লিস্ট রিফ্রেশ
+            } else {
+                alert("Error: " + data.error); // এরর মেসেজটি পরিষ্কার দেখার জন্য
+            }
+        } catch (error) {
+            console.error("Error cancelling:", error);
+            alert("Failed to cancel appointment.");
+        }
+    }
+};
+
     const handleLogout = () => {
         localStorage.removeItem('user');
         window.location.href = '/login';
@@ -104,8 +130,8 @@ const ReceptionistDashboard = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
                 <h2><FaCalendarCheck /> Receptionist Dashboard</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <span>Welcome, {receptionist?.name}</span>
-                    <button onClick={handleLogout} style={{ backgroundColor: '#f44336', color: 'white', border: 'none', padding: '10px 20px', cursor: 'pointer', borderRadius: '5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>Welcome, <strong>{receptionist?.name}</strong></span>
+                    <button onClick={handleLogout} style={{ backgroundColor: '#f44336', color: 'white', border: 'none', padding: '10px 20px', cursor: 'pointer', borderRadius: '5px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
                         <FaSignOutAlt /> Logout
                     </button>
                 </div>
@@ -122,7 +148,7 @@ const ReceptionistDashboard = () => {
                                 <th style={{ padding: '12px' }}>Doctor</th>
                                 <th style={{ padding: '12px' }}>Appt. Time</th>
                                 <th style={{ padding: '12px' }}>Check Schedule</th>
-                                <th style={{ padding: '12px' }}>Action</th>
+                                <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -143,12 +169,18 @@ const ReceptionistDashboard = () => {
                                             <FaEye /> See Schedule
                                         </button>
                                     </td>
-                                    <td style={{ padding: '12px' }}>
+                                    <td style={{ padding: '12px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
                                         <button 
                                             onClick={() => handleConfirm(app.appointment_id)}
                                             style={{ backgroundColor: '#4caf50', color: 'white', border: 'none', padding: '8px 15px', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}
                                         >
                                             Confirm
+                                        </button>
+                                        <button 
+                                            onClick={() => handleCancel(app.appointment_id)}
+                                            style={{ backgroundColor: '#ff5722', color: 'white', border: 'none', padding: '8px 15px', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                            <FaTimesCircle /> Cancel
                                         </button>
                                     </td>
                                 </tr>
@@ -162,7 +194,7 @@ const ReceptionistDashboard = () => {
                 )}
             </div>
 
-            {/* মডাল যেখানে তারিখ যোগ করা হয়েছে */}
+            {/* Modal for Doctor Availability */}
             {showModal && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalContent}>
@@ -173,7 +205,6 @@ const ReceptionistDashboard = () => {
                             {selectedDoctorSchedule && selectedDoctorSchedule.length > 0 ? (
                                 selectedDoctorSchedule.map((s, index) => (
                                     <div key={index} style={{ padding: '10px', backgroundColor: '#f9f9f9', marginBottom: '8px', borderRadius: '4px', borderLeft: '4px solid #00796b' }}>
-                                        {/* তারিখটি এখানে দেখানো হচ্ছে */}
                                         <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '14px' }}>
                                             {new Date(s.date).toLocaleDateString('en-GB')}
                                         </span>
@@ -182,7 +213,7 @@ const ReceptionistDashboard = () => {
                                         <span>{s.hours_start} - {s.hours_end}</span>
                                     </div>
                                 ))
-                            ) : <p>No active schedule found.</p>}
+                            ) : <p>No active schedule found for this doctor.</p>}
                         </div>
                         <button onClick={() => setShowModal(false)} style={{ width: '100%', padding: '12px', backgroundColor: '#333', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>Close</button>
                     </div>

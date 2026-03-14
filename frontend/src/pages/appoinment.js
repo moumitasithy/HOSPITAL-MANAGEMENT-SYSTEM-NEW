@@ -7,7 +7,7 @@ const Appointment = () => {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [doctorServices, setDoctorServices] = useState([]); 
-    const [availableSchedules, setAvailableSchedules] = useState([]); // নতুন: ডাক্তারের শিডিউল রাখার জন্য
+    const [availableSchedules, setAvailableSchedules] = useState([]);
     const [loading, setLoading] = useState(false);
     
     const [formData, setFormData] = useState({
@@ -19,11 +19,11 @@ const Appointment = () => {
         blood_group: '',
         patient_type: 'Out-patient',
         date: '', 
-        appointment_time: '', // slotId এর বদলে সরাসরি সময়
+        appointment_time: '',
         doctorId: '' 
     });
 
-    // যখনই ডাক্তার সিলেক্ট করা হবে, তখনই তার শিডিউল ফেচ হবে
+    // ডাক্তার সিলেক্ট করলে শিডিউল আসবে
     useEffect(() => {
         if (formData.doctorId) {
             fetch(`http://localhost:5000/api/doctor-availability/${formData.doctorId}`)
@@ -37,12 +37,14 @@ const Appointment = () => {
         if (!searchTerm) return alert("Please type something to search!");
         setLoading(true);
         try {
+            // আপনার নতুন সার্চ এপিআই কল করুন
             const response = await fetch(`http://localhost:5000/api/search-doctors-service?query=${searchTerm}`);
             const data = await response.json();
             setDoctorServices(data);
             if(data.length === 0) alert("No doctors found!");
         } catch (err) {
-            alert("Search failed!");
+            console.error("Search failed:", err);
+            alert("Search failed! Check if server is running on port 5000");
         } finally {
             setLoading(false);
         }
@@ -62,16 +64,26 @@ const Appointment = () => {
         setLoading(true);
 
         try {
-            const response = await fetch('http://localhost:5000/api/book-appointment-full', {
+            // আপনার নতুন বুকিং এপিআই কল করুন (v3)
+            const response = await fetch('http://localhost:5000/api/book-appointment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData), 
+                body: JSON.stringify({
+                    name: formData.name,
+                    phone_number: formData.phone_number,
+                    email: formData.email,
+                    age: formData.age,
+                    gender: formData.gender,
+                    date: formData.date,
+                    appointment_time: formData.appointment_time,
+                    doctor_id: formData.doctorId // ডাটাবেস ভেরিয়েবলের সাথে মিল রেখে
+                }), 
             });
 
             const result = await response.json();
 
             if (response.ok) {
-                alert("Success! Your appointment request has been sent.");
+                alert("Success! Your appointment request has been sent to the receptionist.");
                 navigate('/');
             } else {
                 throw new Error(result.error || "Booking failed");
@@ -83,6 +95,7 @@ const Appointment = () => {
         }
     };
 
+    // ... (Styles remains the same)
     const styles = {
         container: {
             minHeight: '100vh', width: '100%',
@@ -115,11 +128,14 @@ const Appointment = () => {
                     <FaCalendarPlus /> Appointment Booking
                 </h2>
 
-                {/* ১. ডক্টর সিলেকশন */}
                 <div style={{ marginBottom: '25px', padding: '20px', background: '#f0f4f4', borderRadius: '12px', border: '1px solid #dee2e6' }}>
                     <label style={styles.label}>1. Find Your Doctor:</label>
                     <div style={{ display: 'flex', gap: '10px' }}>
-                        <input style={{ ...styles.input, margin: 0 }} placeholder="Search Doctor or Specialization..." onChange={(e) => setSearchTerm(e.target.value)} />
+                        <input 
+                            style={{ ...styles.input, margin: 0 }} 
+                            placeholder="Type doctor name (e.g. Moumita)..." 
+                            onChange={(e) => setSearchTerm(e.target.value)} 
+                        />
                         <button onClick={handleSearch} style={styles.searchBtn}><FaSearch /></button>
                     </div>
                     {doctorServices.length > 0 && (
@@ -133,7 +149,6 @@ const Appointment = () => {
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    {/* ২. পেশেন্ট ডিটেইলস */}
                     <label style={styles.label}>2. Patient Details:</label>
                     <input style={styles.input} type="text" name="name" placeholder="Full Name" required onChange={handleChange} />
                     <div style={{ display: 'flex', gap: '10px' }}>
@@ -154,7 +169,6 @@ const Appointment = () => {
                         </select>
                     </div>
 
-                    {/* ৩. ডাইনামিক শিডিউল সিলেকশন */}
                     <label style={styles.label}>3. Select Available Time:</label>
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <input style={styles.input} type="date" name="date" required onChange={handleChange} />

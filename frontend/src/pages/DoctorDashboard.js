@@ -1,10 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-    FaCalendarPlus, FaUserMd, FaSignOutAlt, 
-    FaHospitalUser, FaStethoscope, FaCalendarCheck 
+import {
+    FaCalendarPlus, FaUserMd, FaSignOutAlt,
+    FaHospitalUser, FaStethoscope, FaCalendarCheck
 } from 'react-icons/fa';
-import bgImage from '../assets/Doctor_schedule.jpg'; 
+import bgImage from '../assets/Doctor_schedule.jpg';
 
 const DoctorDashboard = () => {
     const navigate = useNavigate();
@@ -36,7 +36,7 @@ const DoctorDashboard = () => {
             border: '1px solid rgba(255, 255, 255, 0.2)',
             boxShadow: '0 15px 35px rgba(0,0,0,0.5)',
             textAlign: 'center',
-            maxWidth: '800px', 
+            maxWidth: '800px',
             width: '95%'
         },
         welcomeText: {
@@ -103,7 +103,7 @@ const DoctorDashboard = () => {
                 <div style={{ marginBottom: '20px' }}>
                     <FaUserMd size={80} color="#00bfa5" />
                 </div>
-                
+
                 <h1 style={styles.welcomeText}>Welcome, Dr. {user?.name || 'Doctor'}</h1>
                 <p style={styles.subText}>
                     Manage your medical practice, set availability, and control your schedule status from one place.
@@ -111,9 +111,9 @@ const DoctorDashboard = () => {
 
                 <div style={styles.buttonGroup}>
                     {/* Set Schedule Button */}
-                    <button 
-                        onClick={() => navigate('/doctor-schedule')} 
-                        style={{...styles.baseBtn, ...styles.scheduleBtn}}
+                    <button
+                        onClick={() => navigate('/doctor-schedule')}
+                        style={{ ...styles.baseBtn, ...styles.scheduleBtn }}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
                     >
@@ -121,9 +121,9 @@ const DoctorDashboard = () => {
                     </button>
 
                     {/* Manage/Edit Schedule Button */}
-                    <button 
-                        onClick={() => navigate('/manage-schedule')} 
-                        style={{...styles.baseBtn, ...styles.manageBtn}}
+                    <button
+                        onClick={() => navigate('/manage-schedule')}
+                        style={{ ...styles.baseBtn, ...styles.manageBtn }}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
                     >
@@ -131,9 +131,9 @@ const DoctorDashboard = () => {
                     </button>
 
                     {/* Serve Button */}
-                    <button 
-                        onClick={() => navigate('/serve-patient')} 
-                        style={{...styles.baseBtn, ...styles.serveBtn}}
+                    <button
+                        onClick={() => navigate('/serve-patient')}
+                        style={{ ...styles.baseBtn, ...styles.serveBtn }}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
                     >
@@ -141,14 +141,16 @@ const DoctorDashboard = () => {
                     </button>
 
                     {/* Logout Button */}
-                    <button 
-                        onClick={handleLogout} 
-                        style={{...styles.baseBtn, ...styles.logoutBtn}}
+                    <button
+                        onClick={handleLogout}
+                        style={{ ...styles.baseBtn, ...styles.logoutBtn }}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
                     >
                         <FaSignOutAlt /> Logout
                     </button>
+                    
+
                 </div>
 
                 <div style={{ marginTop: '40px', fontSize: '14px', opacity: '0.6' }}>
