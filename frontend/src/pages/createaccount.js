@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import coverImage from '../assets/createaccount.jpg'; 
 
 const CreateAccount = () => {
     const navigate = useNavigate();
     
+    // ডাটাবেস থেকে আসা লিস্ট রাখার জন্য স্টেট
     const [specList, setSpecList] = useState([]);
     const [qualList, setQualList] = useState([]);
+    const [role, setRole] = useState('Doctor');
     const [loading, setLoading] = useState(false);
-    const [selectedFile, setSelectedFile] = useState(null);
+    const [image, setImage] = useState(null);
 
     const [formData, setFormData] = useState({
-        name: '', email: '', phone: '', password: '',
-        role: 'Doctor', consultation_fee: '',
-        specialization: [], // অ্যারে হিসেবে পরিবর্তন
-        qualification: []    // অ্যারে হিসেবে পরিবর্তন
+        name: '',
+        email: '',
+        phone_number: '',
+        password: '',
+        consultation_fee: '',
+        specialization: [], // এখানে সিলেক্ট করা ID গুলোর অ্যারে থাকবে
+        qualification: []   // এখানে সিলেক্ট করা ID গুলোর অ্যারে থাকবে
     });
 
+    // ডাটাবেস থেকে স্পেশালাইজেশন এবং কোয়ালিফিকেশন লোড করা
     useEffect(() => {
-        const fetchDropdownData = async () => {
+        const fetchLists = async () => {
             try {
                 const specRes = await fetch('http://localhost:5000/api/specializations');
                 const qualRes = await fetch('http://localhost:5000/api/qualifications');
@@ -29,10 +34,10 @@ const CreateAccount = () => {
                 setSpecList(Array.isArray(sData) ? sData : []);
                 setQualList(Array.isArray(qData) ? qData : []);
             } catch (err) {
-                console.error("Error fetching data:", err);
+                console.error("Error fetching lists:", err);
             }
         };
-        fetchDropdownData();
+        fetchLists();
     }, []);
 
     const handleChange = (e) => {
@@ -41,153 +46,137 @@ const CreateAccount = () => {
 
     // মাল্টিপল চেকবক্স হ্যান্ডেল করার ফাংশন
     const handleCheckboxChange = (e, type) => {
-        const value = e.target.value;
+        const value = parseInt(e.target.value);
         const isChecked = e.target.checked;
 
-        setFormData(prevData => {
-            const currentList = [...prevData[type]];
-            if (isChecked) {
-                return { ...prevData, [type]: [...currentList, value] };
-            } else {
-                return { ...prevData, [type]: currentList.filter(id => id !== value) };
-            }
+        setFormData(prev => {
+            const currentList = [...prev[type]];
+            const updatedList = isChecked 
+                ? [...currentList, value] 
+                : currentList.filter(id => id !== value);
+            return { ...prev, [type]: updatedList };
         });
-    };
-
-    const handleFileChange = (e) => {
-        setSelectedFile(e.target.files[0]);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        // ভ্যালিডেশন: ডাক্তার হলে অন্তত একটি স্পেশালাইজেশন ও কোয়ালিফিকেশন লাগবে
-        if (formData.role === 'Doctor') {
-            if (formData.specialization.length === 0 || formData.qualification.length === 0) {
-                return alert("Please select at least one Specialization and Qualification");
-            }
-        }
-
         setLoading(true);
+
         const data = new FormData();
         data.append('name', formData.name);
         data.append('email', formData.email);
-        data.append('phone_number', formData.phone);
+        data.append('phone_number', formData.phone_number);
         data.append('password', formData.password);
-        data.append('role', formData.role);
+        data.append('role', role);
 
-        if (formData.role === 'Doctor') {
-            data.append('image', selectedFile);
-            data.append('consultation_fee', formData.consultation_fee);
-            // অ্যারে ডাটাকে JSON স্ট্রিং হিসেবে পাঠানো হচ্ছে
+        if (role === 'Doctor') {
+            data.append('consultation_fee', formData.consultation_fee || 0);
+            // অ্যারেগুলোকে স্ট্রিং হিসেবে পাঠানো হচ্ছে যাতে ব্যাকএন্ডে JSON.parse করা যায়
             data.append('specialization', JSON.stringify(formData.specialization));
             data.append('qualification', JSON.stringify(formData.qualification));
+            if (image) data.append('image', image);
+        } else {
+            data.append('consultation_fee', 0);
+            data.append('specialization', JSON.stringify([]));
+            data.append('qualification', JSON.stringify([]));
         }
 
         try {
-            const response = await fetch('http://localhost:5000/api/createaccount', { 
+            const response = await fetch('http://localhost:5000/api/createaccount', {
                 method: 'POST',
-                body: data, 
+                body: data,
             });
+
             const result = await response.json();
             if (response.ok) {
-                alert("Account created successfully!");
+                alert(result.message);
                 navigate('/login');
             } else {
                 alert("Error: " + result.error);
             }
         } catch (error) {
-            alert("Connection Failed: " + error.message);
+            alert("Server Error! Check your connection.");
         } finally {
             setLoading(false);
         }
     };
 
-    const styles = {
-        container: { height: '100vh', width: '100%', backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url(${coverImage})`, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center', fontFamily: "'Segoe UI', Roboto, sans-serif" },
-        formBox: { backgroundColor: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(10px)', padding: '30px 40px', borderRadius: '20px', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)', width: '480px', textAlign: 'center', color: 'white', border: '1px solid rgba(255, 255, 255, 0.2)', maxHeight: '95vh', overflowY: 'auto' },
-        inputGroup: { marginBottom: '15px', textAlign: 'left' },
-        input: { width: '100%', padding: '10px', borderRadius: '8px', border: 'none', fontSize: '16px', outline: 'none', boxSizing: 'border-box' },
-        select: { width: '100%', padding: '10px', borderRadius: '8px', border: 'none', fontSize: '16px', backgroundColor: '#fff', cursor: 'pointer', boxSizing: 'border-box', color: '#333' },
-        multiSelectBox: { maxHeight: '120px', overflowY: 'auto', backgroundColor: 'white', padding: '10px', borderRadius: '8px', marginTop: '5px' },
-        checkboxItem: { color: '#333', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' },
-        button: { width: '100%', padding: '12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '8px', fontSize: '18px', cursor: 'pointer', marginTop: '10px', fontWeight: 'bold' },
-        label: { display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#ddd' }
-    };
-
     return (
         <div style={styles.container}>
-            <div style={styles.formBox}>
-                <h2 style={{ marginBottom: '20px' }}>Join Our Hospital</h2>
-                <form onSubmit={handleSubmit}>
-                    <input name="name" style={{...styles.input, marginBottom: '15px'}} type="text" placeholder="Full Name" required onChange={handleChange} />
-                    <input name="email" style={{...styles.input, marginBottom: '15px'}} type="email" placeholder="Email Address" required onChange={handleChange} />
-                    <input name="phone" style={{...styles.input, marginBottom: '15px'}} type="tel" placeholder="Phone Number" required onChange={handleChange} />
+            <form onSubmit={handleSubmit} style={styles.form}>
+                <h2 style={{ textAlign: 'center', color: '#fff', marginBottom: '20px' }}>Join Our Hospital</h2>
+                
+                <input style={styles.input} name="name" placeholder="Full Name" onChange={handleChange} required />
+                <input style={styles.input} name="email" type="email" placeholder="Email Address" onChange={handleChange} required />
+                <input style={styles.input} name="phone_number" placeholder="Phone Number" onChange={handleChange} required />
+                
+                <div style={styles.inputGroup}>
+                    <label style={styles.label}>Register As:</label>
+                    <select style={styles.select} value={role} onChange={(e) => setRole(e.target.value)}>
+                        <option value="Doctor">Doctor</option>
+                        <option value="Receptionist">Receptionist</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
 
-                    <div style={styles.inputGroup}>
-                        <label style={styles.label}>Register As:</label>
-                        <select name="role" style={styles.select} value={formData.role} onChange={handleChange}>
-                            <option value="Doctor">Doctor</option>
-                            <option value="Admin">Admin</option>
-                            <option value="Receptionist">Receptionist</option>
-                        </select>
+                {/* শুধুমাত্র Doctor সিলেক্ট করলে নিচের অপশনগুলো আসবে */}
+                {role === 'Doctor' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        <input style={styles.input} name="consultation_fee" type="number" placeholder="Consultation Fee (BDT)" required onChange={handleChange} />
+                        
+                        <label style={styles.label}>Select Specializations:</label>
+                        <div style={styles.multiSelectBox}>
+                            {specList.map(spec => (
+                                <label key={spec.specialization_id} style={styles.checkboxItem}>
+                                    <input 
+                                        type="checkbox" 
+                                        value={spec.specialization_id} 
+                                        onChange={(e) => handleCheckboxChange(e, 'specialization')} 
+                                    />
+                                    {spec.specialization_name}
+                                </label>
+                            ))}
+                        </div>
+
+                        <label style={styles.label}>Select Qualifications:</label>
+                        <div style={styles.multiSelectBox}>
+                            {qualList.map(qual => (
+                                <label key={qual.qualification_id} style={styles.checkboxItem}>
+                                    <input 
+                                        type="checkbox" 
+                                        value={qual.qualification_id} 
+                                        onChange={(e) => handleCheckboxChange(e, 'qualification')} 
+                                    />
+                                    {qual.qualification_name}
+                                </label>
+                            ))}
+                        </div>
+
+                        <label style={styles.label}>Profile Image:</label>
+                        <input style={styles.input} type="file" accept="image/*" onChange={(e) => setImage(e.target.files[0])} required />
                     </div>
+                )}
 
-                    {formData.role === 'Doctor' && (
-                        <>
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Upload Profile Image:</label>
-                                <input style={{...styles.input, padding: '5px'}} type="file" accept="image/*" required onChange={handleFileChange} />
-                            </div>
-                            <input name="consultation_fee" style={{...styles.input, marginBottom: '15px'}} type="number" placeholder="Consultation Fee (BDT)" required onChange={handleChange} />
-                            
-                            {/* মাল্টিপল স্পেশালাইজেশন সেকশন */}
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Specializations (Select Multiple):</label>
-                                <div style={styles.multiSelectBox}>
-                                    {specList.map(spec => (
-                                        <div key={spec.specialization_id} style={styles.checkboxItem}>
-                                            <input 
-                                                type="checkbox" 
-                                                value={spec.specialization_id} 
-                                                checked={formData.specialization.includes(spec.specialization_id.toString())}
-                                                onChange={(e) => handleCheckboxChange(e, 'specialization')}
-                                            />
-                                            {spec.specialization_name}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                <input style={styles.input} name="password" type="password" placeholder="Create Password" onChange={handleChange} required />
 
-                            {/* মাল্টিপল কোয়ালিফিকেশন সেকশন */}
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Qualifications (Select Multiple):</label>
-                                <div style={styles.multiSelectBox}>
-                                    {qualList.map(qual => (
-                                        <div key={qual.qualification_id} style={styles.checkboxItem}>
-                                            <input 
-                                                type="checkbox" 
-                                                value={qual.qualification_id} 
-                                                checked={formData.qualification.includes(qual.qualification_id.toString())}
-                                                onChange={(e) => handleCheckboxChange(e, 'qualification')}
-                                            />
-                                            {qual.qualification_name}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    <input name="password" style={{...styles.input, marginTop: '10px'}} type="password" placeholder="Create Password" required onChange={handleChange} />
-
-                    <button style={styles.button} type="submit" disabled={loading}>
-                        {loading ? "Creating..." : "Create Account"}
-                    </button>
-                </form>
-            </div>
+                <button type="submit" disabled={loading} style={styles.button}>
+                    {loading ? 'Registering...' : 'Create Account'}
+                </button>
+            </form>
         </div>
     );
+};
+
+const styles = {
+    container: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', padding: '20px' },
+    form: { background: 'rgba(255, 255, 255, 0.1)', padding: '30px', borderRadius: '20px', backdropFilter: 'blur(15px)', width: '100%', maxWidth: '450px', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 30px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh', overflowY: 'auto' },
+    input: { margin: '10px 0', padding: '12px', borderRadius: '8px', border: 'none', outline: 'none', backgroundColor: 'rgba(255,255,255,0.9)', fontSize: '15px' },
+    select: { padding: '10px', borderRadius: '8px', border: 'none', width: '100%', marginTop: '5px', cursor: 'pointer' },
+    multiSelectBox: { maxHeight: '120px', overflowY: 'auto', backgroundColor: '#fff', padding: '10px', borderRadius: '8px', marginTop: '5px' },
+    checkboxItem: { display: 'flex', alignItems: 'center', gap: '10px', color: '#333', fontSize: '14px', marginBottom: '8px', cursor: 'pointer' },
+    button: { marginTop: '20px', padding: '14px', borderRadius: '8px', border: 'none', backgroundColor: '#4cc9f0', color: '#1a1a2e', fontSize: '17px', fontWeight: 'bold', cursor: 'pointer' },
+    label: { color: '#ddd', fontSize: '13px', marginTop: '10px', display: 'block' },
+    inputGroup: { margin: '10px 0' }
 };
 
 export default CreateAccount;

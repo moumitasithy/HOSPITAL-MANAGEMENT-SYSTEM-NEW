@@ -22,7 +22,24 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // --- API Routes ---
+// server.js
 
+app.get('/api/receptionist-users', async (req, res) => {
+    try {
+        // ডাটাবেস থেকে role_id = 2 (Receptionist) এর ডাটা আনা হচ্ছে
+        const result = await pool.query(`
+            SELECT u.user_id, u.name, u.email, u.phone_number, r.role_name 
+            FROM users u 
+            JOIN roles r ON u.role_id = r.role_id
+            WHERE u.role_id = 2
+            ORDER BY u.user_id DESC
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("API Error:", err.message);
+        res.status(500).json({ error: "ডাটা লোড করা যায়নি" });
+    }
+});
 
 app.get('/users', async (req, res) => {
   try {
@@ -103,38 +120,35 @@ app.get('/api/doctor-availability/:id', async (req, res) => {
         return res.status(500).json({ error: "Failed to fetch schedule" });
     }
 });
-// ৩. একাউন্ট ক্রিয়েশন (রিসেপশনিস্ট টেবিল হ্যান্ডলিং সহ)
+
 app.post('/api/createaccount', upload.single('image'), async (req, res) => {
     try {
-        const { 
-            name, email, phone_number, password, role, 
-            consultation_fee, qualification, specialization 
-        } = req.body;
-
-        // পাসওয়ার্ড হ্যাশ করা
+        const { name, email, phone_number, password, role, consultation_fee, qualification, specialization } = req.body;
+        
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        
         const image_url = req.file ? `http://localhost:5000/uploads/${req.file.filename}` : null;
 
-        // স্ট্রিং থেকে অ্যারেতে রূপান্তর (FormData হ্যান্ডেল করার জন্য)
-        const specIds = specialization ? JSON.parse(specialization).map(Number) : [];
-        const qualIds = qualification ? JSON.parse(qualification).map(Number) : [];
+        // ফ্রন্টএন্ড থেকে আসা স্ট্রিংগুলোকে অবজেক্টে রূপান্তর
+        const specArr = specialization ? JSON.parse(specialization) : [];
+        const qualArr = qualification ? JSON.parse(qualification) : [];
 
-        // সরাসরি প্রসিডিউর কল করা
-        await pool.query(
-            "CALL create_account($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-            [
-                name, email, phone_number, hashedPassword, role, 
-                consultation_fee || 0, image_url, specIds, qualIds
-            ]
-        );
+        if (role === 'Doctor') {
+            await pool.query(
+                "INSERT INTO pending_doctors (name, email, phone_number, password, consultation_fee, image_url, specialization, qualification) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                [name, email, phone_number, hashedPassword, consultation_fee, image_url, JSON.stringify(specArr), JSON.stringify(qualArr)]
+            );
+            return res.status(201).json({ success: true, message: "Pending for Admin Approval" });
+        }
 
-        res.status(201).json({ success: true, message: "Account created successfully via Procedure" });
-        
+        // বাকিদের জন্য (Receptionist/Admin) সরাসরি তৈরি
+        await pool.query("CALL create_account($1, $2, $3, $4, $5, $6, $7, $8, $9)", [
+            name, email, phone_number, hashedPassword, role, consultation_fee || 0, image_url, specArr, qualArr
+        ]);
+        res.status(201).json({ success: true, message: "Account created" });
     } catch (err) {
-        console.error("Signup Error:", err.message);
-        res.status(500).json({ error: "Failed: " + err.message });
+        console.error(err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -420,6 +434,126 @@ app.put('/api/confirm-appointment/:id', async (req, res) => {
         // ডাটাবেসের RAISE EXCEPTION এখানে ক্যাচ হবে
         console.error(err.message);
         res.status(400).json({ error: err.message }); 
+    }
+});
+
+
+// ১. পেন্ডিং ডাক্তারদের লিস্ট পাওয়ার এপিআই
+app.get('/api/admin/pending-doctors', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT * FROM pending_doctors ORDER BY created_at DESC");
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Fetch Pending Error:", err.message);
+        res.status(500).json({ error: "পেন্ডিং লিস্ট লোড করতে সমস্যা হয়েছে" });
+    }
+});
+app.post('/api/admin/approve-doctor/:id', async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect(); 
+
+    try {
+        await client.query('BEGIN');
+
+        const pendingResult = await client.query("SELECT * FROM pending_doctors WHERE pending_id = $1", [id]);
+        if (pendingResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: "ডাক্তারের তথ্য পাওয়া যায়নি" });
+        }
+
+        const d = pendingResult.rows[0];
+
+        // ডাটাবেস থেকে আসা JSON/String ডাটাকে Array তে রূপান্তর
+        const spec = Array.isArray(d.specialization) ? d.specialization : JSON.parse(d.specialization || '[]');
+        const qual = Array.isArray(d.qualification) ? d.qualification : JSON.parse(d.qualification || '[]');
+
+        await client.query(
+            "CALL create_account($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            [d.name, d.email, d.phone_number, d.password, 'Doctor', d.consultation_fee || 0, d.image_url, spec, qual]
+        );
+
+        await client.query("DELETE FROM pending_doctors WHERE pending_id = $1", [id]);
+        await client.query('COMMIT'); 
+        res.json({ success: true, message: "Doctor approved successfully!" });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
+
+app.delete('/api/delete-user/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // এই একটি লাইন কমান্ড দিলে ট্রিগার অটোমেটিক আর্কাইভ এবং ক্লিনআপ করে দিবে
+        const result = await pool.query("DELETE FROM users WHERE user_id = $1", [id]);
+        
+        if (result.rowCount > 0) {
+            res.json({ message: "User deleted and archived successfully!" });
+        } else {
+            res.status(404).json({ error: "User not found" });
+        }
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+
+// ১. পেন্ডিং ডাক্তারকে সরাসরি ডিলিট/রিজেক্ট করার এপিআই
+// Pending doctor reject/delete korar jonno (Kono archive hobe na)
+app.delete('/api/admin/reject-doctor/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Shudhu pending_doctors table theke delete korbe
+        const result = await pool.query("DELETE FROM pending_doctors WHERE pending_id = $1", [id]);
+        
+        if (result.rowCount > 0) {
+            res.json({ success: true, message: "Doctor request removed permanently." });
+        } else {
+            res.status(404).json({ error: "Doctor not found in pending list." });
+        }
+    } catch (err) {
+        console.error("Delete Error:", err.message);
+        res.status(500).json({ error: "Failed to delete: " + err.message });
+    }
+});
+
+app.get('/api/admin/pending-details/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const doctorId = parseInt(id); // স্ট্রিং থেকে ইনটিজারে রূপান্তর
+
+        if (isNaN(doctorId)) {
+            return res.status(400).json({ error: "Invalid ID" });
+        }
+
+        const result = await pool.query("SELECT * FROM pending_doctors WHERE pending_id = $1", [doctorId]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Doctor not found" });
+        }
+
+        const doc = result.rows[0];
+
+        // JSONB আইডি থেকে নাম রিট্রিভ করা
+        const specIds = Array.isArray(doc.specialization) ? doc.specialization : [];
+        const qualIds = Array.isArray(doc.qualification) ? doc.qualification : [];
+
+        const specs = await pool.query("SELECT specialization_name FROM specializations WHERE specialization_id = ANY($1::int[])", [specIds]);
+        const quals = await pool.query("SELECT qualification_name FROM qualifications WHERE qualification_id = ANY($1::int[])", [qualIds]);
+
+        res.json({
+            ...doc,
+            specialization_names: specs.rows.map(r => r.specialization_name),
+            qualification_names: quals.rows.map(r => r.qualification_name)
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Server Error");
     }
 });
 

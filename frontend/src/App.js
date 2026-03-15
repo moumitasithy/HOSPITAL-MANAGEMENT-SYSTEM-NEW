@@ -6,13 +6,13 @@ import Home from './pages/Home';
 import Doctors from './pages/Doctor';
 import Login from './pages/login'; 
 import CreateAccount from './pages/createaccount'; 
-import Dashboard from './pages/dashboard';
+import AdminDashboard from './pages/Admin_Dashboard'; // আপনার অ্যাডমিন ড্যাশবোর্ড
 import Appointment from './pages/appoinment';
 import Medicines from './pages/Medicines';
 import ReceptionistDashboard from './pages/ReceptionistDashboard';
 import DoctorDashboard from './pages/DoctorDashboard'; 
 import DoctorSchedule from './pages/DoctorSchedule'; 
-import ManageSchedule from './pages/ManageSchedule'; // <--- এই ইমপোর্টটি বাদ পড়েছিল
+import ManageSchedule from './pages/ManageSchedule';
 import MedicalTests from './pages/MedicalTests';
 import ServePatient from './pages/ServePatient';
 
@@ -50,8 +50,15 @@ function App() {
         <Route path="/medicines" element={<Medicines />} />
         <Route path="/medical-tests" element={<MedicalTests />} />
         
-        {/* সাধারণ ড্যাশবোর্ড */}
-        <Route path="/dashboard" element={<Dashboard />} />
+        {/* ৩. অ্যাডমিন ড্যাশবোর্ড (শুধুমাত্র Admin দেখতে পারবে) */}
+        <Route 
+          path="/admin-dashboard" 
+          element={
+            <ProtectedRoute allowedRole="Admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
 
         {/* ১. রিসেপশনিস্ট ড্যাশবোর্ড */}
         <Route 
@@ -63,7 +70,7 @@ function App() {
           } 
         />
 
-        {/* ২. ডাক্তার ড্যাশবোর্ড ও সংশ্লিষ্ট পেজগুলো (সবগুলো প্রোটেক্টেড করা হয়েছে) */}
+        {/* ২. ডাক্তার ড্যাশবোর্ড ও সংশ্লিষ্ট পেজগুলো */}
         <Route 
           path="/doctor-dashboard" 
           element={
@@ -82,7 +89,6 @@ function App() {
           } 
         />
 
-        {/* এই রাউটটি এখন ডাক্তারের জন্য সুরক্ষিত */}
         <Route 
           path="/manage-schedule" 
           element={
@@ -100,8 +106,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-
-
 
         {/* ভুল ইউআরএল দিলে হোমে ব্যাক করবে */}
         <Route path="*" element={<Navigate to="/" />} />
