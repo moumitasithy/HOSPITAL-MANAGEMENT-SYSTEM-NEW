@@ -89,7 +89,7 @@ const PendingDoctorList = () => {
                             <p><strong>Consultation Fee:</strong> {selectedDoc.consultation_fee} BDT</p>
 
                             {/* একাধিক নাম দেখানোর লজিক */}
-                            // মডালের ভেতর স্পেশালাইজেশন এবং কোয়ালিফিকেশন সেকশন
+                            
                             <p>
                                 <strong>Specializations:</strong> {
                                     Array.isArray(selectedDoc.specialization_names) && selectedDoc.specialization_names.length > 0

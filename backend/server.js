@@ -544,7 +544,7 @@ app.get('/api/admin/pending-details/:id', async (req, res) => {
         const qualIds = Array.isArray(doc.qualification) ? doc.qualification : [];
 
         const specs = await pool.query("SELECT specialization_name FROM specializations WHERE specialization_id = ANY($1::int[])", [specIds]);
-        const quals = await pool.query("SELECT qualification_name FROM qualifications WHERE qualification_id = ANY($1::int[])", [qualIds]);
+        const quals = await pool.query("SELECT qualification_name FROM qualification WHERE qualification_id = ANY($1::int[])", [qualIds]);
 
         res.json({
             ...doc,
