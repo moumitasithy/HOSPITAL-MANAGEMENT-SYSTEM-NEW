@@ -53,27 +53,21 @@ app.get('/users', async (req, res) => {
 app.post('/api/book-appointment', async (req, res) => {
     const { 
         name, phone_number, email, age, gender, 
+        blood_group, // ১. ব্লাড গ্রুপটি এখানে রিসিভ করুন
         date, appointment_time, doctor_id 
     } = req.body;
 
     try {
-        // নতুন প্রসিডিউর কল করা হচ্ছে (v3)
-        // এই প্রসিডিউরটি patients এবং appointments টেবিলে ডাটা ইনসার্ট করবে
+        // ২. প্রসিডিউর কল করার সময় ৯টি প্যারামিটার পাস করুন
         await pool.query(
-            'CALL book_appointment_v3($1, $2, $3, $4, $5, $6, $7, $8)',
-            [name, phone_number, email, age, gender, date, appointment_time, doctor_id]
+            'CALL book_appointment_v3($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            [name, phone_number, email, age, gender, blood_group, date, appointment_time, doctor_id]
         );
 
-        res.status(200).json({ 
-            success: true, 
-            message: "Appointment request sent to receptionist!" 
-        });
+        res.status(200).json({ success: true, message: "Success!" });
     } catch (err) {
         console.error("Booking Error:", err.message);
-        res.status(500).json({ 
-            success: false, 
-            error: "Internal Server Error. Please try again." 
-        });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 // ২. পেন্ডিং অ্যাপয়েন্টমেন্ট লিস্ট (রিসেপশনিস্ট ড্যাশবোর্ডের জন্য)
@@ -554,6 +548,51 @@ app.get('/api/admin/pending-details/:id', async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).send("Server Error");
+    }
+});
+
+// এই একটি API দিয়েই এখন আপনার কাজ হয়ে যাবে
+app.post('/api/patients/start-service', async (req, res) => {
+    const { patient_id, doctor_id } = req.body;
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // ১. পেশেন্টের তথ্য চেক এবং ডাটা রিট্রিভ
+        const patientRes = await client.query("SELECT * FROM patients WHERE patient_id = $1", [patient_id]);
+        if (patientRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: "Patient not found" });
+        }
+
+        // ২. Service টেবিলে এন্ট্রি
+        const serviceRes = await client.query(
+            "INSERT INTO service (patient_id) VALUES ($1) RETURNING service_id",
+            [patient_id]
+        );
+        const newServiceId = serviceRes.rows[0].service_id;
+
+        // ৩. doctor_serves টেবিলে এন্ট্রি
+        await client.query(
+            "INSERT INTO doctor_serves (user_id, service_id) VALUES ($1, $2)",
+            [doctor_id, newServiceId]
+        );
+
+        await client.query('COMMIT');
+
+        // সব তথ্য একসাথে ফ্রন্টএন্ডে পাঠিয়ে দিচ্ছি
+        res.json({
+            patient: patientRes.rows[0],
+            service_id: newServiceId
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err.message);
+        res.status(500).json({ error: "Server error occurred while creating service" });
+    } finally {
+        client.release();
     }
 });
 

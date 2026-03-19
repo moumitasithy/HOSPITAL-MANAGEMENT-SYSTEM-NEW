@@ -53,48 +53,46 @@ const Appointment = () => {
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
+const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if(!formData.doctorId || !formData.appointment_time || !formData.date || !formData.blood_group) {
+        return alert("Please select a Doctor, Date, Time, and Blood Group!");
+    }
+    
+    setLoading(true);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        if(!formData.doctorId || !formData.appointment_time || !formData.date) {
-            return alert("Please select a Doctor, Date, and Time!");
+    try {
+        const response = await fetch('http://localhost:5000/api/book-appointment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: formData.name,
+                phone_number: formData.phone_number,
+                email: formData.email,
+                age: formData.age,
+                gender: formData.gender,
+                blood_group: formData.blood_group, // এই লাইনটি যোগ করা হয়েছে
+                date: formData.date,
+                appointment_time: formData.appointment_time,
+                doctor_id: formData.doctorId 
+            }), 
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert("Success! Your appointment request has been sent to the receptionist.");
+            navigate('/');
+        } else {
+            throw new Error(result.error || "Booking failed");
         }
-        
-        setLoading(true);
-
-        try {
-            // আপনার নতুন বুকিং এপিআই কল করুন (v3)
-            const response = await fetch('http://localhost:5000/api/book-appointment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: formData.name,
-                    phone_number: formData.phone_number,
-                    email: formData.email,
-                    age: formData.age,
-                    gender: formData.gender,
-                    date: formData.date,
-                    appointment_time: formData.appointment_time,
-                    doctor_id: formData.doctorId // ডাটাবেস ভেরিয়েবলের সাথে মিল রেখে
-                }), 
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                alert("Success! Your appointment request has been sent to the receptionist.");
-                navigate('/');
-            } else {
-                throw new Error(result.error || "Booking failed");
-            }
-        } catch (error) {
-            alert("Error: " + error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    } catch (error) {
+        alert("Error: " + error.message);
+    } finally {
+        setLoading(false);
+    }
+};
     // ... (Styles remains the same)
     const styles = {
         container: {
