@@ -53,29 +53,24 @@ app.get('/users', async (req, res) => {
 app.post('/api/book-appointment', async (req, res) => {
     const { 
         name, phone_number, email, age, gender, 
+        blood_group, // ১. ব্লাড গ্রুপটি এখানে রিসিভ করুন
         date, appointment_time, doctor_id 
     } = req.body;
 
     try {
-        // নতুন প্রসিডিউর কল করা হচ্ছে (v3)
-        // এই প্রসিডিউরটি patients এবং appointments টেবিলে ডাটা ইনসার্ট করবে
+        // ২. প্রসিডিউর কল করার সময় ৯টি প্যারামিটার পাস করুন
         await pool.query(
-            'CALL book_appointment_v3($1, $2, $3, $4, $5, $6, $7, $8)',
-            [name, phone_number, email, age, gender, date, appointment_time, doctor_id]
+            'CALL book_appointment_v3($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            [name, phone_number, email, age, gender, blood_group, date, appointment_time, doctor_id]
         );
 
-        res.status(200).json({ 
-            success: true, 
-            message: "Appointment request sent to receptionist!" 
-        });
+        res.status(200).json({ success: true, message: "Success!" });
     } catch (err) {
         console.error("Booking Error:", err.message);
-        res.status(500).json({ 
-            success: false, 
-            error: "Internal Server Error. Please try again." 
-        });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
+
 // ২. পেন্ডিং অ্যাপয়েন্টমেন্ট লিস্ট (রিসেপশনিস্ট ড্যাশবোর্ডের জন্য)
 
 app.get('/api/pending-appointments', async (req, res) => {
