@@ -552,4 +552,49 @@ app.get('/api/admin/pending-details/:id', async (req, res) => {
     }
 });
 
+// এই একটি API দিয়েই এখন আপনার কাজ হয়ে যাবে
+app.post('/api/patients/start-service', async (req, res) => {
+    const { patient_id, doctor_id } = req.body;
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // ১. পেশেন্টের তথ্য চেক এবং ডাটা রিট্রিভ
+        const patientRes = await client.query("SELECT * FROM patients WHERE patient_id = $1", [patient_id]);
+        if (patientRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: "Patient not found" });
+        }
+
+        // ২. Service টেবিলে এন্ট্রি
+        const serviceRes = await client.query(
+            "INSERT INTO service (patient_id) VALUES ($1) RETURNING service_id",
+            [patient_id]
+        );
+        const newServiceId = serviceRes.rows[0].service_id;
+
+        // ৩. doctor_serves টেবিলে এন্ট্রি
+        await client.query(
+            "INSERT INTO doctor_serves (user_id, service_id) VALUES ($1, $2)",
+            [doctor_id, newServiceId]
+        );
+
+        await client.query('COMMIT');
+
+        // সব তথ্য একসাথে ফ্রন্টএন্ডে পাঠিয়ে দিচ্ছি
+        res.json({
+            patient: patientRes.rows[0],
+            service_id: newServiceId
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err.message);
+        res.status(500).json({ error: "Server error occurred while creating service" });
+    } finally {
+        client.release();
+    }
+});
+
 app.listen(5000, () => { console.log("Server running on port 5000"); });
