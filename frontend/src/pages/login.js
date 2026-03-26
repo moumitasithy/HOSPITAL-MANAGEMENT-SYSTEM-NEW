@@ -11,7 +11,6 @@ const Login = () => {
         password: ''
     });
 
-    // আগের পেজ থেকে আসা রোল (অপশনাল)
     const userRole = location.state?.role || 'User';
 
     const handleChange = (e) => {
@@ -31,39 +30,41 @@ const Login = () => {
             const result = await response.json();
 
             if (response.ok) {
-                const userData = result.user; 
+                // ১. টোকেন এবং ইউজার ডাটা আলাদা করা
+                const { token, user } = result; 
                 
-                // ইউজার ডাটা লোকাল স্টোরেজে সেভ করা (যাতে প্রোটেক্টেড রাউট কাজ করে)
-                localStorage.setItem('user', JSON.stringify(userData));
+                // ২. টোকেন সেভ করা (এটি আপনার রিকোয়েস্ট হেডারে পাঠাতে হবে)
+                localStorage.setItem('token', token);
                 
-                alert(`Welcome ${userData.name}!`);
+                // ৩. ইউজার অবজেক্ট সেভ করা (রোল চেক করার জন্য)
+                localStorage.setItem('user', JSON.stringify(user));
                 
-                // --- রোল অনুযায়ী অটোমেটিক ড্যাশবোর্ডে পাঠানো ---
-                // ডাটাবেসে যদি 'Doctor' থাকে তবে '/doctor-dashboard' এ যাবে
-                if (userData.role === 'Doctor') {
+                alert(`Welcome ${user.name}!`);
+                
+                // ৪. রোল অনুযায়ী অটোমেটিক রিডাইরেক্ট
+                if (user.role === 'Doctor') {
                     navigate('/doctor-dashboard');
                 } 
-                // ডাটাবেসে যদি 'Receptionist' থাকে তবে '/receptionist-dashboard' এ যাবে
-                else if (userData.role === 'Receptionist') {
+                else if (user.role === 'Receptionist') {
                     navigate('/receptionist-dashboard');
                 } 
-                // অ্যাডমিন হলে (যদি থাকে)
-                else if (userData.role === 'Admin') {
+                else if (user.role === 'Admin') {
                     navigate('/admin-dashboard');
                 } 
-                // সাধারণ ইউজার/পেশেন্ট হলে
                 else {
                     navigate('/dashboard'); 
                 }
                 
             } else {
-                alert(result.error || "Login failed! Please check your credentials.");
+                // ব্যাকএন্ডের catch ব্লক থেকে আসা এরর মেসেজ দেখানো
+                alert(result.message || "Login failed! Please check your credentials.");
             }
         } catch (error) {
             alert("Server not responding. Please check if your backend is running.");
         }
     };
 
+    // ... (আপনার আগের styles অংশটি একই থাকবে)
     const styles = {
         container: {
             height: '100vh', width: '100%',

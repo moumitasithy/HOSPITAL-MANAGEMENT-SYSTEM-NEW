@@ -1,12 +1,24 @@
+
 import React, { useState, useEffect } from 'react';
 
 const PendingDoctorList = () => {
     const [doctors, setDoctors] = useState([]);
     const [selectedDoc, setSelectedDoc] = useState(null);
 
+    // ১. লোকাল স্টোরেজ থেকে টোকেনটি নেওয়া
+    const token = localStorage.getItem('token'); 
+
+    // ২. কমন হেডার ফাংশন (কোড ছোট করার জন্য)
+    const getHeaders = () => ({
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` // টোকেন পাঠানো হচ্ছে
+    });
+
     const fetchPending = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/admin/pending-doctors');
+            const res = await fetch('http://localhost:5000/api/admin/pending-doctors', {
+                headers: getHeaders()
+            });
             const data = await res.json();
             setDoctors(Array.isArray(data) ? data : []);
         } catch (err) {
@@ -16,38 +28,52 @@ const PendingDoctorList = () => {
 
     useEffect(() => { fetchPending(); }, []);
 
- const handleDetailsClick = async (id) => {
-    try {
-        // এখানে নিশ্চিত করুন আপনার পোর্ট এবং URL ঠিক আছে
-        const res = await fetch(`http://localhost:5000/api/admin/pending-details/${id}`);
-        
-        if (!res.ok) {
-            // যদি সার্ভার কোনো এরর দেয় তবে সেটি কনসোলে দেখাবে
-            console.error("Server Error Status:", res.status);
-            alert("Doctor details not found in database.");
-            return;
-        }
+    const handleDetailsClick = async (id) => {
+        try {
+            const res = await fetch(`http://localhost:5000/api/admin/pending-details/${id}`, {
+                headers: getHeaders()
+            });
+            
+            if (!res.ok) {
+                const errorData = await res.json();
+                alert(errorData.message || "Access Denied!");
+                return;
+            }
 
-        const data = await res.json();
-        console.log("Details Data Received:", data); // চেক করার জন্য কনসোলে প্রিন্ট করুন
-        setSelectedDoc(data); 
-    } catch (err) {
-        console.error("Network error:", err);
-        alert("Could not connect to the server. Please check if your backend is running.");
-    }
-};
+            const data = await res.json();
+            setSelectedDoc(data); 
+        } catch (err) {
+            console.error("Network error:", err);
+            alert("Could not connect to the server.");
+        }
+    };
 
     const handleApprove = async (id) => {
-        const res = await fetch(`http://localhost:5000/api/admin/approve-doctor/${id}`, { method: 'POST' });
-        if (res.ok) { alert("Doctor Approved!"); fetchPending(); }
+        try {
+            const res = await fetch(`http://localhost:5000/api/admin/approve-doctor/${id}`, { 
+                method: 'POST',
+                headers: getHeaders()
+            });
+            if (res.ok) { 
+                alert("Doctor Approved!"); 
+                fetchPending(); 
+            }
+        } catch (err) { console.error(err); }
     };
 
     const handleDelete = async (id) => {
         if (window.confirm("Permanently reject this request?")) {
-            const res = await fetch(`http://localhost:5000/api/admin/reject-doctor/${id}`, { method: 'DELETE' });
-            if (res.ok) { fetchPending(); }
+            try {
+                const res = await fetch(`http://localhost:5000/api/admin/reject-doctor/${id}`, { 
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                if (res.ok) { fetchPending(); }
+            } catch (err) { console.error(err); }
         }
     };
+
+    // ... (বাকি JSX এবং Styles আপনার আগের কোডেই ঠিক আছে)
 
     return (
         <div style={styles.container}>

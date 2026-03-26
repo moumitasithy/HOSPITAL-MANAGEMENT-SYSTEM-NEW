@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // useEffect যোগ করা হয়েছে
 import { useNavigate } from 'react-router-dom';
 import {
     FaCalendarPlus, FaUserMd, FaSignOutAlt,
@@ -9,10 +9,22 @@ import bgImage from '../assets/Doctor_schedule.jpg';
 const DoctorDashboard = () => {
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem('token'); // টোকেন রিড করা
+
+    // ১. সিকিউরিটি চেক: টোকেন না থাকলে লগইন পেজে পাঠিয়ে দিবে
+    useEffect(() => {
+        if (!token || user?.role !== 'Doctor') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            navigate('/login');
+        }
+    }, [token, user, navigate]);
 
     const handleLogout = () => {
+        localStorage.removeItem('token');
         localStorage.removeItem('user');
-        navigate('/login');
+        // সরাসরি window.location ব্যবহার করা ভালো যাতে সব স্টেট ক্লিয়ার হয়
+        window.location.href = '/login';
     };
 
     const styles = {
@@ -73,7 +85,7 @@ const DoctorDashboard = () => {
             boxShadow: '0 5px 15px rgba(0, 121, 107, 0.4)'
         },
         manageBtn: {
-            backgroundColor: '#f57c00', // Manage Schedule-এর জন্য আলাদা অরেঞ্জ কালার
+            backgroundColor: '#f57c00',
             boxShadow: '0 5px 15px rgba(245, 124, 0, 0.4)'
         },
         serveBtn: {
@@ -86,7 +98,6 @@ const DoctorDashboard = () => {
         }
     };
 
-    // হোভার ইফেক্ট হ্যান্ডেল করার জন্য কমন ফাংশন
     const handleMouseEnter = (e) => {
         e.currentTarget.style.transform = 'translateY(-5px)';
         e.currentTarget.style.filter = 'brightness(1.1)';
@@ -96,6 +107,9 @@ const DoctorDashboard = () => {
         e.currentTarget.style.transform = 'translateY(0)';
         e.currentTarget.style.filter = 'brightness(1)';
     };
+
+    // যদি ইউজার না থাকে তবে ব্ল্যাঙ্ক স্ক্রিন দেখাবে যতক্ষণ রিডাইরেক্ট না হয়
+    if (!token) return null;
 
     return (
         <div style={styles.container}>
@@ -110,7 +124,6 @@ const DoctorDashboard = () => {
                 </p>
 
                 <div style={styles.buttonGroup}>
-                    {/* Set Schedule Button */}
                     <button
                         onClick={() => navigate('/doctor-schedule')}
                         style={{ ...styles.baseBtn, ...styles.scheduleBtn }}
@@ -120,7 +133,6 @@ const DoctorDashboard = () => {
                         <FaCalendarPlus /> Set New Schedule
                     </button>
 
-                    {/* Manage/Edit Schedule Button */}
                     <button
                         onClick={() => navigate('/manage-schedule')}
                         style={{ ...styles.baseBtn, ...styles.manageBtn }}
@@ -130,7 +142,6 @@ const DoctorDashboard = () => {
                         <FaCalendarCheck /> Manage Schedule
                     </button>
 
-                    {/* Serve Button */}
                     <button
                         onClick={() => navigate('/serve-patient')}
                         style={{ ...styles.baseBtn, ...styles.serveBtn }}
@@ -140,7 +151,6 @@ const DoctorDashboard = () => {
                         <FaStethoscope /> Serve
                     </button>
 
-                    {/* Logout Button */}
                     <button
                         onClick={handleLogout}
                         style={{ ...styles.baseBtn, ...styles.logoutBtn }}
@@ -149,8 +159,6 @@ const DoctorDashboard = () => {
                     >
                         <FaSignOutAlt /> Logout
                     </button>
-                    
-
                 </div>
 
                 <div style={{ marginTop: '40px', fontSize: '14px', opacity: '0.6' }}>
