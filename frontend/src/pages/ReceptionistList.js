@@ -4,6 +4,15 @@ const ReceptionistList = () => {
     const [receptionists, setReceptionists] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // ১. টোকেন গেট করার জন্য কমন ফাংশন
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('token');
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // টোকেন পাঠানো হচ্ছে
+        };
+    };
+
     const styles = {
         table: { 
             width: '100%', 
@@ -56,13 +65,14 @@ const ReceptionistList = () => {
     const fetchRec = async () => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:5000/api/receptionist-users');
-            if (!res.ok) throw new Error("Network error");
+            const res = await fetch('http://localhost:5000/api/receptionist-users', {
+                method: 'GET',
+                headers: getAuthHeaders() // হেডার্স যোগ করা হলো
+            });
+            
+            if (!res.ok) throw new Error("Unauthorized or Network error");
             
             const data = await res.json();
-            console.log("Database Data:", data); // চেক করার জন্য
-
-            // সরাসরি ডাটা সেট করা হচ্ছে (যেহেতু ব্যাকএন্ড থেকেই ফিল্টার হয়ে আসছে)
             setReceptionists(data); 
         } catch (err) {
             console.error("Fetch Error:", err);
@@ -78,7 +88,11 @@ const ReceptionistList = () => {
     const handleDelete = async (id) => {
         if (!window.confirm("Are you sure you want to delete this receptionist?")) return;
         try {
-            const res = await fetch(`http://localhost:5000/api/delete-user/${id}`, { method: 'DELETE' });
+            const res = await fetch(`http://localhost:5000/api/delete-user/${id}`, { 
+                method: 'DELETE',
+                headers: getAuthHeaders() // ডিলিট করার সময়ও টোকেন লাগবে
+            });
+            
             if (res.ok) {
                 alert("Receptionist deleted successfully!");
                 fetchRec(); 

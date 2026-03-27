@@ -6,7 +6,7 @@ import Home from './pages/Home';
 import Doctors from './pages/Doctor';
 import Login from './pages/login'; 
 import CreateAccount from './pages/createaccount'; 
-import AdminDashboard from './pages/Admin_Dashboard'; // আপনার অ্যাডমিন ড্যাশবোর্ড
+import AdminDashboard from './pages/Admin_Dashboard';
 import Appointment from './pages/appoinment';
 import Medicines from './pages/Medicines';
 import ReceptionistDashboard from './pages/ReceptionistDashboard';
@@ -16,24 +16,32 @@ import ManageSchedule from './pages/ManageSchedule';
 import MedicalTests from './pages/MedicalTests';
 import ServePatient from './pages/ServePatient';
 
-// প্রোটেক্টেড রাউট ফাংশন
+// --- আপডেট করা প্রোটেক্টেড রাউট ফাংশন ---
 const ProtectedRoute = ({ children, allowedRole }) => {
     const userString = localStorage.getItem('user');
+    const token = localStorage.getItem('token'); // টোকেন চেক যোগ করা হয়েছে
     
-    if (!userString) {
-        return <Navigate to="/login" />;
+    // ১. যদি টোকেন বা ইউজার ডাটা কোনোটিই না থাকে
+    if (!token || !userString) {
+        return <Navigate to="/login" replace />;
     }
 
     try {
         const user = JSON.parse(userString);
-        // ইউজারের রোল যদি অনুমোদিত রোলের সাথে না মিলে তবে লগইনে পাঠাবে
+        
+        // ২. ইউজারের রোল চেক করা
         if (user.role !== allowedRole) {
-            return <Navigate to="/login" />;
+            // রোল না মিললে হোমে বা অন্য কোনো সেফ পেজে পাঠিয়ে দিন
+            console.warn("Unauthorized access attempt!");
+            return <Navigate to="/" replace />;
         }
+        
+        // ৩. সব ঠিক থাকলে পেজটি রেন্ডার হবে
         return children;
     } catch (error) {
-        console.error("User data parse error:", error);
-        return <Navigate to="/login" />;
+        console.error("Auth error:", error);
+        localStorage.clear(); // এরর হলে স্টোরেজ ক্লিয়ার করে লগইনে পাঠানো নিরাপদ
+        return <Navigate to="/login" replace />;
     }
 };
 
@@ -50,7 +58,7 @@ function App() {
         <Route path="/medicines" element={<Medicines />} />
         <Route path="/medical-tests" element={<MedicalTests />} />
         
-        {/* ৩. অ্যাডমিন ড্যাশবোর্ড (শুধুমাত্র Admin দেখতে পারবে) */}
+        {/* ৩. অ্যাডমিন ড্যাশবোর্ড */}
         <Route 
           path="/admin-dashboard" 
           element={

@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const ServePatient = () => {
     // ১. স্টেট ম্যানেজমেন্ট
     const [idInput, setIdInput] = useState('');
     const [currentDate, setCurrentDate] = useState('');
-    const [currentServiceId, setCurrentServiceId] = useState(null); // নতুন সার্ভিস আইডি রাখার জন্য
+    const [currentServiceId, setCurrentServiceId] = useState(null);
     const [description, setDescription] = useState('');
     const [advice, setAdvice] = useState('');
+    const [loading, setLoading] = useState(false);
     const [patient, setPatient] = useState({
         name: '', phone_number: '', email: '', age: '', gender: '', blood_group: '', patient_type: ''
     });
@@ -17,60 +18,93 @@ const ServePatient = () => {
     const [medicines, setMedicines] = useState([{ name: '', duration: '', schedule: '0+0+0', timing: 'After Meal' }]);
     const [tests, setTests] = useState([{ test_name: '' }]);
 
-    // ২. ডেট সেট করা
+    // ২. টোকেন এবং ইউজার ডাটা নেওয়া
+    const token = localStorage.getItem('token');
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    const doctorId = storedUser?.user_id || storedUser?.id;
+
     useEffect(() => {
         const today = new Date();
         const options = { year: 'numeric', month: 'long', day: 'numeric' };
         setCurrentDate(today.toLocaleDateString('en-GB', options));
     }, []);
 
-    // ৩. পেশেন্ট সার্চ এবং অটোমেটিক সার্ভিস ক্রিয়েশন (Transaction API Call)
+    // ৩. টোকেন সহ হেডারের কমন ফাংশন
+    const getAuthHeaders = useCallback(() => ({
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    }), [token]);
+
+    // ৪. পেশেন্ট সার্চ এবং সার্ভিস শুরু (Token Added)
     const fetchPatientData = async () => {
-    if (!idInput) return;
-
-    // ১. প্রথমে পুরো 'user' অবজেক্টটি স্ট্রিং হিসেবে আনুন
-    const storedUser = localStorage.getItem('user'); 
-    
-    let doctorId = null;
-
-    if (storedUser) {
-        // ২. স্ট্রিংটিকে অবজেক্টে রূপান্তর করুন
-        const userData = JSON.parse(storedUser);
-        // ৩. আপনার ডাটাবেস অনুযায়ী user_id অথবা id ফিল্ডটি নিন
-        doctorId = userData.user_id || userData.id; 
-    }
-
-    // ৪. যদি আইডি না পাওয়া যায় তবেই এরর দিন
-    if (!doctorId) {
-        alert("Doctor not logged in! Please login first.");
-        return;
-    }
-
-    try {
-        const res = await fetch(`http://localhost:5000/api/patients/start-service`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                patient_id: idInput,
-                doctor_id: doctorId
-            })
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            setPatient(data.patient);
-            setCurrentServiceId(data.service_id);
-            console.log("Service Started. ID:", data.service_id);
-        } else {
-            const errorData = await res.json();
-            alert(errorData.error || "Error fetching patient data!");
-            clearAllFields();
+        if (!idInput) return;
+        if (!doctorId || !token) {
+            alert("Session expired. Please login again.");
+            return;
         }
-    } catch (err) {
-        console.error("Fetch error:", err);
-        alert("Connection to server failed.");
-    }
-};
+
+        try {
+            const res = await fetch(`http://localhost:5000/api/patients/start-service`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    patient_id: idInput,
+                    doctor_id: doctorId
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setPatient(data.patient);
+                setCurrentServiceId(data.service_id);
+                console.log("Service Started. ID:", data.service_id);
+            } else {
+                const errorData = await res.json();
+                alert(errorData.error || "Error fetching patient data!");
+                clearAllFields();
+            }
+        } catch (err) {
+            console.error("Fetch error:", err);
+            alert("Connection to server failed.");
+        }
+    };
+
+    // ৫. প্রিসক্রিপশন সেভ করার ফাংশন (Token Added)
+    const handleSavePrescription = async () => {
+        if (!currentServiceId) return alert("No active service found!");
+        
+        setLoading(true);
+        const prescriptionPayload = {
+            service_id: currentServiceId,
+            description,
+            advice,
+            history,
+            diagnoses,
+            medicines,
+            tests
+        };
+
+        try {
+            const res = await fetch(`http://localhost:5000/api/patients/save-prescription`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(prescriptionPayload)
+            });
+
+            if (res.ok) {
+                alert("Prescription Saved Successfully!");
+                clearAllFields();
+                setIdInput('');
+            } else {
+                const errorData = await res.json();
+                alert("Save Failed: " + errorData.error);
+            }
+        } catch (err) {
+            alert("Server error during saving.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const clearAllFields = () => {
         setPatient({ name: '', phone_number: '', email: '', age: '', gender: '', blood_group: '', patient_type: '' });
@@ -83,7 +117,6 @@ const ServePatient = () => {
         setTests([{ test_name: '' }]);
     };
 
-    // ৪. ডাইনামিক রো হ্যান্ডলিং ফাংশন
     const addRow = (state, setState, schema) => setState([...state, schema]);
     const removeRow = (state, setState, index) => setState(state.filter((_, i) => i !== index));
     const handleUpdate = (state, setState, index, field, value) => {
@@ -100,12 +133,12 @@ const ServePatient = () => {
             <div style={styles.topBar}>
                 <div style={styles.dateBox}>
                     <strong>Date:</strong> {currentDate} <br/>
-                    {currentServiceId && <small>Service ID: #{currentServiceId}</small>}
+                    {currentServiceId && <small style={{color: '#28a745'}}>Service ID: #{currentServiceId}</small>}
                 </div>
                 
                 <div style={styles.searchSection}>
                     <label style={styles.label}>Patient ID:</label>
-                    <input type="text" placeholder="ID" value={idInput} onChange={(e) => setIdInput(e.target.value)} onBlur={fetchPatientData} style={styles.idInput} />
+                    <input type="text" placeholder="ID" value={idInput} onChange={(e) => setIdInput(e.target.value)} style={styles.idInput} />
                     <button onClick={fetchPatientData} style={styles.searchBtn}>Search & Start Service</button>
                 </div>
 
@@ -196,28 +229,31 @@ const ServePatient = () => {
                 </div>
             </div>
 
-            {/* --- ADVICE SECTION (Full Width) --- */}
             <div style={styles.sectionCard}>
                 <h3 style={styles.sectionTitle}>Advice & Instructions</h3>
                 <textarea placeholder="Advice..." value={advice} onChange={(e) => setAdvice(e.target.value)} style={styles.textAreaAdvice} />
             </div>
 
-            <button style={styles.saveBtn} onClick={() => alert("Ready to save Service ID: " + currentServiceId)}>
-                Save Prescription
+            <button 
+                style={{...styles.saveBtn, backgroundColor: loading ? '#6c757d' : '#28a745'}} 
+                onClick={handleSavePrescription}
+                disabled={loading}
+            >
+                {loading ? "Saving Prescription..." : "Save Prescription"}
             </button>
         </div>
     );
 };
 
-// ... Styles remains the same as previous response ...
 const styles = {
     container: { padding: '20px', maxWidth: '1300px', margin: '0 auto', fontFamily: 'Segoe UI, Arial', background: '#f4f7f6' },
     topBar: { background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #ddd', position: 'relative', marginBottom: '20px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
     dateBox: { position: 'absolute', top: '15px', right: '20px', color: '#007bff', textAlign: 'right', fontWeight: 'bold', fontSize: '13px', border: '1px solid #007bff', padding: '5px 10px', borderRadius: '5px' },
     searchSection: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' },
-    idInput: { padding: '8px', width: '80px', borderRadius: '5px', border: '1px solid #ccc' },
+    idInput: { padding: '8px', width: '120px', borderRadius: '5px', border: '1px solid #ccc' },
     searchBtn: { padding: '8px 15px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' },
     infoGrid: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', borderTop: '1px solid #eee', paddingTop: '15px', fontSize: '13px' },
+    infoBox: { padding: '5px', background: '#f9f9f9', borderRadius: '4px' },
     mainLayout: { display: 'flex', gap: '20px', marginBottom: '20px' },
     leftCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' },
     rightCol: { flex: 2, display: 'flex', flexDirection: 'column', gap: '20px' },
@@ -229,10 +265,10 @@ const styles = {
     input: { padding: '9px', borderRadius: '5px', border: '1px solid #ccc', outline: 'none', fontSize: '13px' },
     textArea: { width: '100%', height: '110px', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '14px', outline: 'none', boxSizing: 'border-box' },
     textAreaHistory: { flex: 2, height: '50px', padding: '8px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '13px', outline: 'none', resize: 'none' },
-    textAreaAdvice: { width: '100%', height: '80px', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '14px', outline: 'none', boxSizing: 'border-box' },
+    textAreaAdvice: { width: '100%', height: '80px', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '14px', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' },
     addBtnSmall: { padding: '5px 12px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' },
     removeBtn: { background: '#dc3545', color: '#fff', border: 'none', borderRadius: '50%', width: '25px', height: '25px', cursor: 'pointer' },
-    saveBtn: { width: '100%', padding: '15px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' }
+    saveBtn: { width: '100%', padding: '15px', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' }
 };
 
 export default ServePatient;
