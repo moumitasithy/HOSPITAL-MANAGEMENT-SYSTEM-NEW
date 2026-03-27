@@ -203,7 +203,7 @@ const ServePatient = () => {
             </div>
 
             <button style={styles.saveBtn} onClick={() => alert("Ready to save Service ID: " + currentServiceId)}>
-                Save & Finalize Prescription
+                Save Prescription
             </button>
         </div>
     );
