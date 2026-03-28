@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from 'react'; // useEffect যোগ করা হয়েছে
-import { useNavigate } from 'react-router-dom'; // useNavigate যোগ করা হয়েছে
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PendingDoctors from './PendingDoctors';
 import DoctorsList from './DoctorsList';
 import ReceptionistList from './ReceptionistList';
+import DoctorStats from './DoctorStats'; // নতুন ইম্পোর্ট
 
 const AdminDashboard = () => {
     const [view, setView] = useState('pending');
     const navigate = useNavigate();
 
-    // ১. লোকাল স্টোরেজ থেকে ডাটা নেওয়া
+    // ১. লোকাল স্টোরেজ থেকে ডাটা নেওয়া
     const user = JSON.parse(localStorage.getItem('user'));
     const token = localStorage.getItem('token');
 
     // ২. সিকিউরিটি চেক (Auth Guard)
     useEffect(() => {
-        // যদি টোকেন না থাকে অথবা ইউজারের রোল 'Admin' না হয়
+        // যদি টোকেন না থাকে অথবা ইউজারের রোল 'Admin' না হয়
         if (!token || user?.role !== 'Admin') {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
@@ -30,9 +31,29 @@ const AdminDashboard = () => {
     };
 
     const styles = {
-        container: { display: 'flex', minHeight: '100vh', backgroundImage: "url('/admin_bg.jpg')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' },
-        sidebar: { width: '260px', backgroundColor: 'rgba(26, 26, 46, 0.95)', color: 'white', padding: '30px 20px', display: 'flex', flexDirection: 'column' },
-        logo: { fontSize: '24px', color: '#4cc9f0', textAlign: 'center', marginBottom: '40px', fontWeight: 'bold' },
+        container: { 
+            display: 'flex', 
+            minHeight: '100vh', 
+            backgroundImage: "url('/admin_bg.jpg')", 
+            backgroundSize: 'cover', 
+            backgroundPosition: 'center', 
+            backgroundAttachment: 'fixed' 
+        },
+        sidebar: { 
+            width: '260px', 
+            backgroundColor: 'rgba(26, 26, 46, 0.95)', 
+            color: 'white', 
+            padding: '30px 20px', 
+            display: 'flex', 
+            flexDirection: 'column' 
+        },
+        logo: { 
+            fontSize: '24px', 
+            color: '#4cc9f0', 
+            textAlign: 'center', 
+            marginBottom: '40px', 
+            fontWeight: 'bold' 
+        },
         sideBtn: (isActive) => ({ 
             width: '100%', 
             padding: '12px', 
@@ -47,7 +68,7 @@ const AdminDashboard = () => {
             transition: '0.3s'
         }),
         logoutBtn: { 
-            marginTop: 'auto', // বাটনটিকে সাইডবারের নিচে নিয়ে যাবে
+            marginTop: 'auto', 
             width: '100%', 
             padding: '12px', 
             border: 'none', 
@@ -57,39 +78,63 @@ const AdminDashboard = () => {
             cursor: 'pointer', 
             fontWeight: 'bold' 
         },
-        contentArea: { flex: 1, padding: '40px', display: 'flex', justifyContent: 'center' },
-        card: { width: '100%', maxWidth: '1000px', backgroundImage: "url('/doctor_list_bg.jpg')", backgroundSize: 'cover', borderRadius: '15px', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' },
-        tableWrapper: { backgroundColor: 'rgba(255, 255, 255, 0.92)', padding: '30px', minHeight: '600px' }
+        contentArea: { 
+            flex: 1, 
+            padding: '40px', 
+            display: 'flex', 
+            justifyContent: 'center' 
+        },
+        card: { 
+            width: '100%', 
+            maxWidth: '1000px', 
+            backgroundImage: "url('/doctor_list_bg.jpg')", 
+            backgroundSize: 'cover', 
+            borderRadius: '15px', 
+            overflow: 'hidden', 
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)' 
+        },
+        tableWrapper: { 
+            backgroundColor: 'rgba(255, 255, 255, 0.92)', 
+            padding: '30px', 
+            minHeight: '600px' 
+        }
     };
 
-    // যদি টোকেন না থাকে তবে কিছুই রেন্ডার করবে না (রিডাইরেক্ট হওয়ার আগ পর্যন্ত)
+    // যদি টোকেন না থাকে তবে কিছুই রেন্ডার করবে না (রিডাইরেক্ট হওয়ার আগ পর্যন্ত)
     if (!token || user?.role !== 'Admin') return null;
 
     return (
         <div style={styles.container}>
             <div style={styles.sidebar}>
                 <div style={styles.logo}>ADMIN PANEL</div>
-                <p style={{textAlign: 'center', fontSize: '12px', marginBottom: '20px', color: '#aaa'}}>Logged in as: {user?.name}</p>
+                <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '20px', color: '#aaa' }}>
+                    Logged in as: {user?.name}
+                </p>
                 
                 <button style={styles.sideBtn(view === 'pending')} onClick={() => setView('pending')}>Approve Doctors</button>
                 <button style={styles.sideBtn(view === 'doctors')} onClick={() => setView('doctors')}>Doctors List</button>
                 <button style={styles.sideBtn(view === 'receptionists')} onClick={() => setView('receptionists')}>Receptionists</button>
                 
-                {/* লগআউট বাটন */}
+                {/* স্ট্যাটিস্টিকস বাটন */}
+                <button style={styles.sideBtn(view === 'statistics')} onClick={() => setView('statistics')}>Appointment Stats</button>
+                
                 <button style={styles.logoutBtn} onClick={handleLogout}>Logout</button>
             </div>
 
             <div style={styles.contentArea}>
                 <div style={styles.card}>
                     <div style={styles.tableWrapper}>
-                        <h2 style={{color: '#1a1a2e', borderBottom: '2px solid #4cc9f0', paddingBottom: '10px', marginBottom: '20px'}}>
-                            {view.toUpperCase()} MANAGEMENT
+                        <h2 style={{ color: '#1a1a2e', borderBottom: '2px solid #4cc9f0', paddingBottom: '10px', marginBottom: '20px' }}>
+                            {view === 'statistics' ? 'APPOINTMENT STATISTICS' : `${view.toUpperCase()} MANAGEMENT`}
                         </h2>
                         
-                        {/* সাব-কম্পোনেন্টগুলোতে টোকেন হ্যান্ডেলিং */}
+                        {/* ভিউ অনুযায়ী কম্পোনেন্ট রেন্ডারিং */}
                         {view === 'pending' && <PendingDoctors />}
                         {view === 'doctors' && <DoctorsList />}
                         {view === 'receptionists' && <ReceptionistList />}
+                        
+                        {/* নতুন কম্পোনেন্ট লোড হবে এখানে */}
+                        {view === 'statistics' && <DoctorStats />}
                     </div>
                 </div>
             </div>

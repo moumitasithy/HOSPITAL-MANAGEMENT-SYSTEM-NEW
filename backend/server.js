@@ -838,4 +838,18 @@ app.post('/api/patients/start-service', verifyToken, async (req, res) => {
     }
 });
 
+app.get('/api/admin/doctor-stats', async (req, res) => {
+    const { month, year } = req.query;
+    try {
+        const result = await pool.query(
+            "SELECT * FROM get_monthly_doctor_stats($1, $2)",
+            [parseInt(month), parseInt(year)]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 app.listen(5000, () => { console.log("Server running on port 5000"); });
