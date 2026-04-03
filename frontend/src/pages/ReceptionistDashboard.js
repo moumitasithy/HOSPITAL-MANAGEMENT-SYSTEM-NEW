@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
     FaCalendarCheck, FaEye, FaSignOutAlt, FaUserMd, 
     FaTimesCircle, FaHospitalUser, FaUserPlus, FaListUl, 
-    FaBed, FaStethoscope, FaTint, FaNotesMedical 
+    FaBed, FaStethoscope, FaTint, FaNotesMedical, FaDoorOpen
 } from 'react-icons/fa';
 import bgImage from '../assets/Receptionist_schedule.jpg';
 
@@ -21,7 +21,6 @@ const AdmitPatientForm = ({ getHeaders }) => {
     });
 
     useEffect(() => {
-        // ডাক্তার এবং রোগের ডাটা লোড করা
         const fetchInitialData = async () => {
             try {
                 const res = await fetch('http://localhost:5000/api/get-admission-data', { headers: getHeaders() });
@@ -131,6 +130,56 @@ const AdmitPatientForm = ({ getHeaders }) => {
             </div>
             <button type="submit" style={{ gridColumn: 'span 2', padding: '15px', backgroundColor: '#004d40', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', marginTop: '10px' }}>
                 Confirm Admission
+            </button>
+        </form>
+    );
+};
+
+// --- Release Patient Form Component ---
+const ReleasePatientForm = ({ getHeaders }) => {
+    const [releaseData, setReleaseData] = useState({ 
+        admission_id: '', 
+        release_date: new Date().toISOString().split('T')[0] 
+    });
+
+    const handleRelease = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await fetch('http://localhost:5000/api/release-patient', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(releaseData)
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(data.message);
+                window.location.reload();
+            } else {
+                alert("Error: " + data.message);
+            }
+        } catch (err) { alert("Server error."); }
+    };
+
+    return (
+        <form onSubmit={handleRelease} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label>Admission ID</label>
+                <input 
+                    type="number" placeholder="Enter ID" required 
+                    onChange={e => setReleaseData({...releaseData, admission_id: e.target.value})} 
+                    style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }}
+                />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label>Release Date</label>
+                <input 
+                    type="date" required value={releaseData.release_date}
+                    onChange={e => setReleaseData({...releaseData, release_date: e.target.value})} 
+                    style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }}
+                />
+            </div>
+            <button type="submit" style={{ padding: '15px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>
+                Process Release
             </button>
         </form>
     );
@@ -263,6 +312,9 @@ const ReceptionistDashboard = () => {
                 <button style={styles.sideBtn(view === 'admit')} onClick={() => setView('admit')}>
                     <FaUserPlus /> Admit Patient
                 </button>
+                <button style={styles.sideBtn(view === 'release')} onClick={() => setView('release')}>
+                    <FaDoorOpen /> Release Patient
+                </button>
                 <button onClick={handleLogout} style={styles.logoutBtn}>
                     <FaSignOutAlt /> Logout
                 </button>
@@ -271,7 +323,7 @@ const ReceptionistDashboard = () => {
             <div style={styles.mainContent}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px', alignItems: 'center' }}>
                     <h2 style={{ color: '#004d40', margin: 0 }}>
-                        {view === 'approval' ? 'Appointment Management' : 'Patient Admission'}
+                        {view === 'approval' ? 'Appointment Management' : view === 'admit' ? 'Patient Admission' : 'Patient Discharge'}
                     </h2>
                 </div>
 
@@ -311,7 +363,7 @@ const ReceptionistDashboard = () => {
                                                 </td>
                                                 <td style={{ padding: '15px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
                                                     <button onClick={() => handleConfirm(app.appointment_id)} style={{ backgroundColor: '#4caf50', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Confirm</button>
-                                                    <button onClick={() => handleCancel(app.appointment_id)} style={{ backgroundColor: '#ff5722', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px', cursor: 'pointer' }}><FaTimesCircle /></button>
+                                                    <button onClick={() => handleCancel(app.appointment_id)} style={{ backgroundColor: '#ff5252', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px', cursor: 'pointer' }}><FaTimesCircle /></button>
                                                 </td>
                                             </tr>
                                         )) : <tr><td colSpan="5" style={{ textAlign: 'center', padding: '30px' }}>No pending requests.</td></tr>}
@@ -320,12 +372,19 @@ const ReceptionistDashboard = () => {
                             </div>
                         )}
                     </div>
-                ) : (
+                ) : view === 'admit' ? (
                     <div style={styles.card}>
                         <h3 style={{ color: '#004d40', borderBottom: '2px solid #00bfa5', paddingBottom: '10px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <FaUserPlus /> New Patient Admission
                         </h3>
                         <AdmitPatientForm getHeaders={getHeaders} />
+                    </div>
+                ) : (
+                    <div style={styles.card}>
+                        <h3 style={{ color: '#d32f2f', borderBottom: '2px solid #ff5252', paddingBottom: '10px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <FaDoorOpen /> Release Patient
+                        </h3>
+                        <ReleasePatientForm getHeaders={getHeaders} />
                     </div>
                 )}
             </div>

@@ -970,4 +970,57 @@ app.get('/api/available-beds/:category', async (req, res) => {
     }
 });
 
+app.post('/api/release-patient', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { admission_id, release_date } = req.body;
+        await client.query('BEGIN');
+
+        // ১. admission টেবিলে রিলিজ ডেট আপডেট
+        await client.query(
+            `UPDATE admission SET release_date = $1 WHERE admission_id = $2`,
+            [release_date, admission_id]
+        );
+
+        // ২. ALLOCATION টেবিল আপডেট এবং প্রয়োজনীয় ডাটা সংগ্রহ
+        const allocRes = await client.query(
+            `UPDATE ALLOCATION 
+             SET TO_DATE = $1 
+             WHERE admission_id = $2 
+             RETURNING bed_no, FROM_DATE`,
+            [release_date, admission_id]
+        );
+
+        if (allocRes.rows.length > 0) {
+            const { bed_no, from_date } = allocRes.rows[0];
+
+            // ৩. bedsallocated টেবিলে ডিলিট না করে end_date আপডেট (আপনার রিকোয়েস্ট অনুযায়ী)
+            // এখানে bed_no এবং start_date (from_date) ব্যবহার করে সঠিক রো টি খুঁজে বের করা হচ্ছে
+            await client.query(
+                `UPDATE bedsallocated 
+                 SET end_date = $1 
+                 WHERE bed_no = $2 AND start_date = $3`,
+                [release_date, bed_no, from_date]
+            );
+
+            // ৪. beds টেবিলের স্ট্যাটাস 'Available' করা
+            await client.query(
+                `UPDATE beds SET status = 'Available' WHERE bed_no = $1`,
+                [bed_no]
+            );
+        } else {
+            throw new Error("Admission ID-র বিপরীতে কোনো সচল বেড পাওয়া যায়নি।");
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: "পেশেন্ট সফলভাবে রিলিজ হয়েছে এবং বেড এখন ফাঁকা।" });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err.message);
+        res.status(500).json({ success: false, message: "ব্যর্থ হয়েছে: " + err.message });
+    } finally {
+        client.release();
+    }
+});
+
 app.listen(5000, () => { console.log("Server running on port 5000"); });
