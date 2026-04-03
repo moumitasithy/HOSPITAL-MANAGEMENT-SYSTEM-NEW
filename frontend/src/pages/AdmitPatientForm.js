@@ -24,10 +24,20 @@ const AdmitPatientForm = ({ getHeaders }) => {
 
     // ক্যাটাগরি চেঞ্জ হলে এভেইলএবল বেড আনা
     const handleCategoryChange = async (cat) => {
-        setSelectedCategory(cat);
+    setSelectedCategory(cat);
+    if (!cat) {
+        setBeds([]);
+        return;
+    }
+    try {
         const res = await fetch(`http://localhost:5000/api/available-beds/${cat}`, { headers: getHeaders() });
         const data = await res.json();
-        setBeds(data);
+        // নিশ্চিত করুন যে ডাটাটি একটি অ্যারে
+        setBeds(Array.isArray(data) ? data : []);
+    } catch (err) {
+        console.error(err);
+        setBeds([]);
+    }
     };
 
     const handleSubmit = async (e) => {
@@ -90,8 +100,10 @@ const AdmitPatientForm = ({ getHeaders }) => {
             </select>
 
             <select required onChange={e => setFormData({...formData, bed_no: e.target.value})} style={styles.input} disabled={!beds.length}>
-                <option value="">Select Bed No</option>
-                {beds.map(b => <option key={b.bed_no} value={b.bed_no}>{b.bed_no}</option>)}
+               <option value="">{beds.length ? "Select Bed No" : "No beds available"}</option>
+               {Array.isArray(beds) && beds.map(b => (
+              <option key={b.bed_no} value={b.bed_no}>{b.bed_no}</option>
+              ))}
             </select>
 
             <button type="submit" style={styles.btn}>Confirm Admission</button>

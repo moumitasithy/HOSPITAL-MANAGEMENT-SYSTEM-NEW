@@ -863,10 +863,11 @@ app.post('/api/admit-patient', async (req, res) => {
         await client.query('BEGIN');
 
         // ১. Patients টেবিলে ইনসার্ট (patient_type auto 'Out-patient')
+        // server.js এর ১ নম্বর ইনসার্ট কুয়েরি
         const patientRes = await client.query(
-            `INSERT INTO patients (name, phone_number, email, age, gender, blood_group, patient_type) 
-             VALUES ($1, $2, $3, $4, $5, $6, 'Out-patient') RETURNING patient_id`,
-            [name, phone, email, age, gender, blood_group]
+           `INSERT INTO patients (name, phone_number, email, age, gender, blood_group, patient_type) 
+            VALUES ($1, $2, $3, $4, $5, $6, 'In-patient') RETURNING patient_id`,
+          [name, phone, email, age, gender, blood_group]
         );
         const patientId = patientRes.rows[0].patient_id;
 
