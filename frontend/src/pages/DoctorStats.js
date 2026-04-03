@@ -2,89 +2,113 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const DoctorStats = () => {
+    const [activeSubView, setActiveSubView] = useState('doctor'); // 'doctor', 'disease', 'stay'
     const [stats, setStats] = useState([]);
+    
+    // ফিল্টার স্টেট
     const [month, setMonth] = useState(new Date().getMonth() + 1);
     const [year, setYear] = useState(2026);
-    const [showChart, setShowChart] = useState(true); // চার্ট না কি লিস্ট দেখাবে তার স্টেট
+    const [fromDate, setFromDate] = useState('2026-01-01');
+    const [toDate, setToDate] = useState('2026-12-31');
+    const [showChart, setShowChart] = useState(true);
+
+    const COLORS = ['#4cc9f0', '#4361ee', '#3f37c9', '#4895ef', '#560bad', '#f72585', '#b5179e'];
 
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await fetch(`http://localhost:5000/api/admin/doctor-stats?month=${month}&year=${year}`);
+                let url = '';
+                if (activeSubView === 'doctor') {
+                    url = `http://localhost:5000/api/admin/doctor-stats?month=${month}&year=${year}`;
+                } else if (activeSubView === 'disease') {
+                    url = `http://localhost:5000/api/admin/disease-stats?fromDate=${fromDate}&toDate=${toDate}`;
+                } else {
+                    url = `http://localhost:5000/api/admin/stay-duration-stats?fromDate=${fromDate}&toDate=${toDate}`;
+                }
+
+                const res = await fetch(url);
                 const data = await res.json();
-                setStats(data);
+                setStats(data || []);
             } catch (err) {
-                console.error("Error fetching stats:", err);
+                console.error("Error loading stats:", err);
             }
         };
         fetchStats();
-    }, [month, year]);
+    }, [activeSubView, month, year, fromDate, toDate]);
 
-    const maxApps = stats.length > 0 ? Math.max(...stats.map(s => s.total_appointments)) : 0;
-    const COLORS = ['#4cc9f0', '#4361ee', '#3f37c9', '#4895ef', '#560bad'];
+    // ডাইনামিক ডেটা কি (Key) সেট করা
+    const getDataKey = () => {
+        if (activeSubView === 'doctor') return { x: 'doctor_name', y: 'total_appointments' };
+        if (activeSubView === 'disease') return { x: 'disease_name', y: 'total_patients' };
+        return { x: 'duration', y: 'patient_count' };
+    };
+
+    const keys = getDataKey();
+    const maxVal = stats.length > 0 ? Math.max(...stats.map(s => s[keys.y])) : 0;
 
     return (
         <div style={{ padding: '10px' }}>
-            {/* --- কন্ট্রোল প্যানেল --- */}
-            <div style={styles.controlPanel}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <select value={month} onChange={(e) => setMonth(e.target.value)} style={styles.select}>
-                        {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m, i) => (
-                            <option key={i} value={i + 1}>{m}</option>
-                        ))}
-                    </select>
-                    <input type="number" value={year} onChange={(e) => setYear(e.target.value)} style={styles.yearInput} />
-                </div>
+            {/* সাব-মেনু ট্যাব */}
+            <div style={styles.tabContainer}>
+                <button onClick={() => setActiveSubView('doctor')} style={activeSubView === 'doctor' ? styles.tabActive : styles.tabInactive}>Doctor Wise</button>
+                <button onClick={() => setActiveSubView('disease')} style={activeSubView === 'disease' ? styles.tabActive : styles.tabInactive}>Disease Wise</button>
+                <button onClick={() => setActiveSubView('stay')} style={activeSubView === 'stay' ? styles.tabActive : styles.tabInactive}>Stay Duration</button>
+            </div>
 
+            {/* ফিল্টার কন্ট্রোল */}
+            <div style={styles.filterBox}>
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                    {activeSubView === 'doctor' ? (
+                        <>
+                            <select value={month} onChange={(e) => setMonth(e.target.value)} style={styles.input}>
+                                {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+                            </select>
+                            <input type="number" value={year} onChange={(e) => setYear(e.target.value)} style={{...styles.input, width: '80px'}} />
+                        </>
+                    ) : (
+                        <>
+                            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={styles.input} />
+                            <span style={{color: '#666'}}>to</span>
+                            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={styles.input} />
+                        </>
+                    )}
+                </div>
                 <div style={styles.toggleGroup}>
-                    <button 
-                        onClick={() => setShowChart(true)} 
-                        style={showChart ? styles.activeTab : styles.inactiveTab}>Bar Chart</button>
-                    <button 
-                        onClick={() => setShowChart(false)} 
-                        style={!showChart ? styles.activeTab : styles.inactiveTab}>Progress List</button>
+                    <button onClick={() => setShowChart(true)} style={showChart ? styles.toggleOn : styles.toggleOff}>Chart</button>
+                    <button onClick={() => setShowChart(false)} style={!showChart ? styles.toggleOn : styles.toggleOff}>List</button>
                 </div>
             </div>
 
-            {/* --- কন্টেন্ট এরিয়া --- */}
+            {/* কন্টেন্ট প্রদর্শন */}
             {stats.length === 0 ? (
-                <div style={styles.noData}>No appointment data found for this period.</div>
+                <div style={styles.noData}>No records found for this selection.</div>
             ) : (
                 showChart ? (
-                    /* --- ১. বার চার্ট ভিউ --- */
-                    <div style={{ height: 400, marginTop: '20px', background: '#fff', padding: '20px', borderRadius: '15px' }}>
+                    <div style={styles.chartWrapper}>
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={stats}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                                <XAxis dataKey="doctor_name" axisLine={false} tickLine={false} tick={{fill: '#667', fontSize: 12}} />
-                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#667'}} />
-                                <Tooltip 
-                                    cursor={{fill: '#f4f7f6'}} 
-                                    contentStyle={{borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} 
-                                />
-                                <Bar dataKey="total_appointments" radius={[10, 10, 0, 0]} barSize={50}>
+                                <XAxis dataKey={keys.x} tick={{fontSize: 12}} />
+                                <YAxis tick={{fontSize: 12}} />
+                                <Tooltip cursor={{fill: '#f8f9fa'}} contentStyle={{borderRadius: '10px'}} />
+                                <Bar dataKey={keys.y} radius={[8, 8, 0, 0]} barSize={45}>
                                     {stats.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 ) : (
-                    /* --- ২. প্রগ্রেস বার লিস্ট ভিউ --- */
-                    <div style={styles.statsList}>
+                    <div style={styles.listContainer}>
                         {stats.map((s, i) => (
-                            <div key={i} style={styles.statRow}>
-                                <div style={styles.docInfo}>
-                                    <span style={styles.docName}>{s.doctor_name}</span>
-                                    <span style={styles.docCount}>{s.total_appointments} Appointments</span>
+                            <div key={i} style={styles.listItem}>
+                                <div style={styles.listText}>
+                                    <span>{s[keys.x]} {activeSubView === 'stay' ? 'Days' : ''}</span>
+                                    <strong>{s[keys.y]} {activeSubView === 'doctor' ? 'Appointments' : 'Patients'}</strong>
                                 </div>
-                                <div style={styles.barBg}>
-                                    <div style={{
-                                        ...styles.barFill,
-                                        width: `${(s.total_appointments / maxApps) * 100}%`,
-                                        background: COLORS[i % COLORS.length]
-                                    }}></div>
+                                <div style={styles.barContainer}>
+                                    <div style={{...styles.barFill, width: `${(s[keys.y] / maxVal) * 100}%`, backgroundColor: COLORS[i % COLORS.length]}} />
                                 </div>
                             </div>
                         ))}
@@ -96,20 +120,21 @@ const DoctorStats = () => {
 };
 
 const styles = {
-    controlPanel: { display: 'flex', justifyContent: 'space-between', marginBottom: '25px', background: 'rgba(255,255,255,0.5)', padding: '15px', borderRadius: '12px' },
-    select: { padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', cursor: 'pointer' },
-    yearInput: { padding: '8px', borderRadius: '8px', border: '1px solid #ddd', width: '80px', outline: 'none' },
-    toggleGroup: { display: 'flex', background: '#eee', borderRadius: '10px', padding: '4px' },
-    activeTab: { padding: '8px 15px', border: 'none', borderRadius: '8px', background: '#fff', color: '#4361ee', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', cursor: 'pointer' },
-    inactiveTab: { padding: '8px 15px', border: 'none', background: 'transparent', color: '#777', cursor: 'pointer' },
-    noData: { textAlign: 'center', padding: '50px', color: '#888', fontStyle: 'italic' },
-    statsList: { display: 'flex', flexDirection: 'column', gap: '15px' },
-    statRow: { background: '#fff', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' },
-    docInfo: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px' },
-    docName: { fontWeight: '600', color: '#333' },
-    docCount: { color: '#666', fontSize: '14px' },
-    barBg: { width: '100%', height: '8px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' },
-    barFill: { height: '100%', transition: 'width 0.8s ease-in-out' }
+    tabContainer: { display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #f0f0f0', paddingBottom: '10px' },
+    tabActive: { padding: '10px 18px', border: 'none', background: '#4cc9f0', color: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    tabInactive: { padding: '10px 18px', border: 'none', background: '#f0f0f0', color: '#666', borderRadius: '8px', cursor: 'pointer' },
+    filterBox: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '15px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' },
+    input: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' },
+    toggleGroup: { background: '#f0f0f0', padding: '4px', borderRadius: '8px' },
+    toggleOn: { padding: '6px 12px', border: 'none', background: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
+    toggleOff: { padding: '6px 12px', border: 'none', background: 'transparent', color: '#888', cursor: 'pointer' },
+    chartWrapper: { height: '400px', background: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
+    noData: { padding: '100px', textAlign: 'center', color: '#aaa', fontStyle: 'italic' },
+    listContainer: { display: 'flex', flexDirection: 'column', gap: '12px' },
+    listItem: { background: '#fff', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' },
+    listText: { display: 'flex', justifyContent: 'space-between', marginBottom: '8px' },
+    barContainer: { height: '8px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' },
+    barFill: { height: '100%', transition: 'width 0.6s ease' }
 };
 
 export default DoctorStats;

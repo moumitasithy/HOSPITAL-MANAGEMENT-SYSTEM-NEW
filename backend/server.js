@@ -1023,4 +1023,36 @@ app.post('/api/release-patient', async (req, res) => {
     }
 });
 
+// ১. রোগ অনুযায়ী স্ট্যাটাস এন্ডপয়েন্ট
+app.get('/api/admin/disease-stats', async (req, res) => {
+    const { fromDate, toDate } = req.query;
+    try {
+        // ফাংশন কল করা হচ্ছে
+        const result = await pool.query(
+            `SELECT * FROM get_disease_stats($1, $2)`,
+            [fromDate, toDate]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Database error while fetching disease stats" });
+    }
+});
+
+// ২. স্টে ডিউরেশন স্ট্যাটাস এন্ডপয়েন্ট
+app.get('/api/admin/stay-duration-stats', async (req, res) => {
+    const { fromDate, toDate } = req.query;
+    try {
+        // ফাংশন কল করা হচ্ছে
+        const result = await pool.query(
+            `SELECT * FROM get_stay_duration_stats($1, $2)`,
+            [fromDate, toDate]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Database error while fetching duration stats" });
+    }
+});
+
 app.listen(5000, () => { console.log("Server running on port 5000"); });
