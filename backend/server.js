@@ -1055,4 +1055,70 @@ app.get('/api/admin/stay-duration-stats', async (req, res) => {
     }
 });
 
+app.post('/api/patients/save-prescription', verifyToken, async (req, res) => {
+    // ডক্টর রোল চেক
+    if (req.userRole !== 'Doctor') {
+        return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    const { service_id, patient_id, description, advice, history, diagnoses, medicines, tests } = req.body;
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // ১. Medical Histories এ ডাটা ইনসার্ট (Multiple Rows)
+        if (history && history.length > 0) {
+            for (let h of history) {
+                if (h.condition) {
+                    await client.query(
+                        `INSERT INTO medical_histories (patient_id, disease_name, medication) 
+                         VALUES ($1, $2, $3)`,
+                        [patient_id, h.condition, h.current_meds]
+                    );
+                }
+            }
+        }
+
+        // ২. Diagnosis এ ডাটা ইনসার্ট (Multiple Rows)
+        if (diagnoses && diagnoses.length > 0) {
+            for (let d of diagnoses) {
+                if (d.disease) {
+                    await client.query(
+                        `INSERT INTO diagnosis (service_id, diagnosis_name, severity) 
+                         VALUES ($1, $2, $3)`,
+                        [service_id, d.disease, d.severity]
+                    );
+                }
+            }
+        }
+
+        // ৩. পূর্ণাঙ্গ প্রিসক্রিপশন টেক্সট তৈরি করা (PDF Link Column এর জন্য)
+        const fullPrescriptionText = `
+            CHIEF COMPLAINTS: ${description}
+            DIAGNOSIS: ${diagnoses.map(d => `${d.disease} (${d.severity})`).join(', ')}
+            PAST HISTORY: ${history.map(h => `${h.condition}: ${h.current_meds}`).join(' | ')}
+            MEDICINES (Rx): ${medicines.map(m => `${m.name} - ${m.schedule} - ${m.duration} days (${m.timing})`).join(' | ')}
+            TESTS: ${tests.map(t => t.test_name).join(', ')}
+            ADVICE: ${advice}
+        `.trim();
+
+        // ৪. Prescription টেবিলে ইনসার্ট
+        await client.query(
+            `INSERT INTO prescription (service_id, pdf_link) VALUES ($1, $2)`,
+            [service_id, fullPrescriptionText]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: "Prescription and Histories saved successfully!" });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Save Prescription Error:", err.message);
+        res.status(500).json({ error: "Failed to save prescription data." });
+    } finally {
+        client.release();
+    }
+});
+
 app.listen(5000, () => { console.log("Server running on port 5000"); });

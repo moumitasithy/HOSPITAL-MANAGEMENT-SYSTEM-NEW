@@ -70,41 +70,55 @@ const ServePatient = () => {
     };
 
     // ৫. প্রিসক্রিপশন সেভ করার ফাংশন (Token Added)
-    const handleSavePrescription = async () => {
-        if (!currentServiceId) return alert("No active service found!");
-        
-        setLoading(true);
-        const prescriptionPayload = {
-            service_id: currentServiceId,
-            description,
-            advice,
-            history,
-            diagnoses,
-            medicines,
-            tests
-        };
+   // ৫. প্রিসক্রিপশন সেভ করার সম্পূর্ণ ফাংশন (Merged & Verified)
+const handleSavePrescription = async () => {
+    // সেফটি চেক: সার্ভিস আইডি বা পেশেন্ট আইডি না থাকলে সেভ হবে না
+    if (!currentServiceId) {
+        return alert("❌ No active service found! Please search for a patient and start service first.");
+    }
+    if (!idInput) {
+        return alert("❌ Patient ID is missing! Cannot save medical history.");
+    }
 
-        try {
-            const res = await fetch(`http://localhost:5000/api/patients/save-prescription`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify(prescriptionPayload)
-            });
+    setLoading(true);
 
-            if (res.ok) {
-                alert("Prescription Saved Successfully!");
-                clearAllFields();
-                setIdInput('');
-            } else {
-                const errorData = await res.json();
-                alert("Save Failed: " + errorData.error);
-            }
-        } catch (err) {
-            alert("Server error during saving.");
-        } finally {
-            setLoading(false);
-        }
+    // সব ডাটা একত্রে পেলোড হিসেবে তৈরি করা
+    const prescriptionPayload = {
+        service_id: currentServiceId,
+        patient_id: idInput, // medical_histories টেবিলের জন্য এটি বাধ্যতামূলক
+        description,         // চিফ কমপ্লেইন্টস
+        advice,              // পরামর্শ
+        history,             // পাষ্ট মেডিকেল হিস্ট্রি লিস্ট
+        diagnoses,           // ডায়াগনোসিস লিস্ট
+        medicines,           // ওষুধের লিস্ট
+        tests                // টেস্টের লিস্ট
     };
+
+    try {
+        const res = await fetch(`http://localhost:5000/api/patients/save-prescription`, {
+            method: 'POST',
+            headers: getAuthHeaders(), // এখানে টোকেন এবং কন্টেন্ট-টাইপ আছে
+            body: JSON.stringify(prescriptionPayload)
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            // সফল হলে মেসেজ দেখাবে এবং সব ফিল্ড ক্লিয়ার করে দিবে
+            alert("✅ Prescription, Medical History, and Diagnosis saved successfully!");
+            clearAllFields();
+            setIdInput(''); 
+        } else {
+            // সার্ভার থেকে কোনো এরর আসলে তা দেখাবে
+            alert("❌ Save Failed: " + (data.message || data.error || "Unknown error occurred"));
+        }
+    } catch (err) {
+        console.error("Save Error:", err);
+        alert("❌ Server connection failed! Please check if the backend is running.");
+    } finally {
+        setLoading(false);
+    }
+};
 
     const clearAllFields = () => {
         setPatient({ name: '', phone_number: '', email: '', age: '', gender: '', blood_group: '', patient_type: '' });
