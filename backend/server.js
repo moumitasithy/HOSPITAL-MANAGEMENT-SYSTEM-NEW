@@ -848,70 +848,32 @@ app.get('/api/admin/doctor-stats', async (req, res) => {
 });
 
 app.post('/api/admit-patient', async (req, res) => {
-    const client = await pool.connect(); // Transaction শুরু করার জন্য
-    try {
-        const { 
-            name, phone, email, age, gender, blood_group, 
-            admission_date, disease_id, doctor_id, bed_no 
-        } = req.body;
+    const { 
+        name, phone, email, age, gender, blood_group, 
+        admission_date, disease_id, doctor_id, bed_no 
+    } = req.body;
 
+    const client = await pool.connect();
+
+    try {
         await client.query('BEGIN');
 
-        // ১. Patients টেবিলে ইনসার্ট (patient_type auto 'Out-patient')
-        // server.js এর ১ নম্বর ইনসার্ট কুয়েরি
-        const patientRes = await client.query(
-           `INSERT INTO patients (name, phone_number, email, age, gender, blood_group, patient_type) 
-            VALUES ($1, $2, $3, $4, $5, $6, 'In-patient') RETURNING patient_id`,
-          [name, phone, email, age, gender, blood_group]
-        );
-        const patientId = patientRes.rows[0].patient_id;
-
-        // ২. Admission টেবিলে ইনসার্ট
-        const admissionRes = await client.query(
-            `INSERT INTO admission (admission_date, disease_id) 
-             VALUES ($1, $2) RETURNING admission_id`,
-            [admission_date, disease_id]
-        );
-        const admissionId = admissionRes.rows[0].admission_id;
-
-        // ৩. Service টেবিলে ইনসার্ট
-        const serviceRes = await client.query(
-            `INSERT INTO service (patient_id, admission_id) 
-             VALUES ($1, $2) RETURNING service_id`,
-            [patientId, admissionId]
-        );
-        const serviceId = serviceRes.rows[0].service_id;
-
-        // ৪. DOCTOR_SERVES টেবিলে ইনসার্ট
-        await client.query(
-            `INSERT INTO DOCTOR_SERVES (user_id, service_id) VALUES ($1, $2)`,
-            [doctor_id, serviceId]
+        // ফাংশন কল করা হচ্ছে (১০টি প্যারামিটারসহ)
+        const result = await client.query(
+            `SELECT admit_patient_fn($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) as success`,
+            [name, phone, email, age, gender, blood_group, admission_date, disease_id, doctor_id, bed_no]
         );
 
-        // ৫. bedsallocated টেবিলে ইনসার্ট
-        await client.query(
-            `INSERT INTO bedsallocated (bed_no, start_date) VALUES ($1, $2)`,
-            [bed_no, admission_date]
-        );
-
-        // ৬. ALLOCATION টেবিলে ইনসার্ট
-        await client.query(
-            `INSERT INTO ALLOCATION (FROM_DATE, admission_id, bed_no) VALUES ($1, $2, $3)`,
-            [admission_date, admissionId, bed_no]
-        );
-
-        // ৭. beds টেবিলের স্ট্যাটাস আপডেট (Booked)
-        await client.query(
-            `UPDATE beds SET status = 'Booked' WHERE bed_no = $1`,
-            [bed_no]
-        );
-
-        await client.query('COMMIT');
-        res.json({ success: true, message: "Patient admitted and bed booked successfully!" });
+        if (result.rows[0].success) {
+            await client.query('COMMIT');
+            res.json({ success: true, message: "Patient admitted and bed booked successfully!" });
+        } else {
+            throw new Error("Admission function returned false");
+        }
 
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error(err.message);
+        console.error("Admission Error:", err.message);
         res.status(500).json({ success: false, message: "Admission failed: " + err.message });
     } finally {
         client.release();
