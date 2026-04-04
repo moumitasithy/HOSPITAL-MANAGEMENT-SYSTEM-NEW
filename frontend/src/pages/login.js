@@ -52,7 +52,7 @@ const Login = () => {
                     navigate('/admin-dashboard');
                 } 
                 else {
-                    navigate('/dashboard'); 
+                    navigate('/Home'); 
                 }
                 
             } else {
