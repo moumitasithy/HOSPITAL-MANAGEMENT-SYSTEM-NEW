@@ -226,7 +226,7 @@ app.post('/api/login', async (req, res) => {
                 const token = jwt.sign(
                     { id: user.user_id, role: user.role }, 
                     JWT_SECRET, 
-                    { expiresIn: '1d' }
+                    { expiresIn: '30m' }
                 );
 
                 // ৪. ফ্রন্টএন্ডে ডাটা পাঠানো
@@ -786,8 +786,7 @@ app.get('/api/admin/pending-details/:id', verifyToken, async (req, res) => {
 });
 // এই একটি API দিয়েই এখন আপনার কাজ হয়ে যাবে
 app.post('/api/patients/start-service', verifyToken, async (req, res) => {
-    // ১. শুধুমাত্র ডক্টর কি না তা চেক করা
-    // আপনার ডাটাবেসে যদি 'Doctor' শব্দটি হুবহু এভাবে থাকে (Case-sensitive)
+    // ১. শুধুমাত্র ডক্টর কি না তা চেক করা (verifyToken থেকে প্রাপ্ত Role)
     if (req.userRole !== 'Doctor') {
         return res.status(403).json({ 
             success: false, 
@@ -801,38 +800,34 @@ app.post('/api/patients/start-service', verifyToken, async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // ২. পেশেন্টের তথ্য চেক
+        // ২. পেশেন্টের তথ্য চেক (পেশেন্ট বিদ্যমান কি না নিশ্চিত করা)
         const patientRes = await client.query("SELECT * FROM patients WHERE patient_id = $1", [patient_id]);
         if (patientRes.rows.length === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({ error: "Patient not found" });
         }
 
-        // ৩. Service টেবিলে এন্ট্রি
-        const serviceRes = await client.query(
-            "INSERT INTO service (patient_id) VALUES ($1) RETURNING service_id",
-            [patient_id]
+        // ৩. ডেটাবেস ফাংশন কল করা (SELECT function_name)
+        const funcRes = await client.query(
+            "SELECT start_patient_service_fn($1, $2) as service_id",
+            [patient_id, doctor_id]
         );
-        const newServiceId = serviceRes.rows[0].service_id;
-
-        // ৪. doctor_serves টেবিলে এন্ট্রি
-        await client.query(
-            "INSERT INTO doctor_serves (user_id, service_id) VALUES ($1, $2)",
-            [doctor_id, newServiceId]
-        );
+        
+        const newServiceId = funcRes.rows[0].service_id;
 
         await client.query('COMMIT');
 
+        // ৪. ফ্রন্টএন্ডে রেসপন্স পাঠানো
         res.json({
             success: true,
-            patient: patientRes.rows[0],
-            service_id: newServiceId
+            patient: patientRes.rows[0], // পেশেন্টের ডিটেইলস (নাম, বয়স ইত্যাদি)
+            service_id: newServiceId     // নতুন তৈরি হওয়া সার্ভিস আইডি
         });
 
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error("Start Service Error:", err.message);
-        res.status(500).json({ error: "Server error occurred while creating service" });
+        console.error("Start Service Function Error:", err.message);
+        res.status(500).json({ error: "Server error occurred while executing service function" });
     } finally {
         client.release();
     }
