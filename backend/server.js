@@ -834,11 +834,12 @@ app.post('/api/patients/start-service', verifyToken, async (req, res) => {
 });
 
 app.get('/api/admin/doctor-stats', async (req, res) => {
-    const { month, year } = req.query;
+    const { month, year, limit } = req.query;
+    const finalLimit = limit ? parseInt(limit) : 1000; // ইনপুট না থাকলে ডিফল্ট ১০০০
     try {
         const result = await pool.query(
-            "SELECT * FROM get_monthly_doctor_stats($1, $2)",
-            [parseInt(month), parseInt(year)]
+            "SELECT * FROM get_monthly_doctor_stats($1, $2, $3)",
+            [parseInt(month), parseInt(year), finalLimit]
         );
         res.json(result.rows);
     } catch (err) {
@@ -982,12 +983,12 @@ app.post('/api/release-patient', async (req, res) => {
 
 // ১. রোগ অনুযায়ী স্ট্যাটাস এন্ডপয়েন্ট
 app.get('/api/admin/disease-stats', async (req, res) => {
-    const { fromDate, toDate } = req.query;
+    const { fromDate, toDate, limit } = req.query;
+    const finalLimit = limit ? parseInt(limit) : 1000;
     try {
-        // ফাংশন কল করা হচ্ছে
         const result = await pool.query(
-            `SELECT * FROM get_disease_stats($1, $2)`,
-            [fromDate, toDate]
+            `SELECT * FROM get_disease_stats($1, $2, $3)`,
+            [fromDate, toDate, finalLimit]
         );
         res.json(result.rows);
     } catch (err) {

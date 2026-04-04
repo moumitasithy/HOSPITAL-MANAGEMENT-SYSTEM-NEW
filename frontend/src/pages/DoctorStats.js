@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const DoctorStats = () => {
-    const [activeSubView, setActiveSubView] = useState('doctor'); // 'doctor', 'disease', 'stay'
+    const [activeSubView, setActiveSubView] = useState('doctor');
     const [stats, setStats] = useState([]);
     
     // ফিল্টার স্টেট
@@ -10,6 +10,7 @@ const DoctorStats = () => {
     const [year, setYear] = useState(2026);
     const [fromDate, setFromDate] = useState('2026-01-01');
     const [toDate, setToDate] = useState('2026-12-31');
+    const [limit, setLimit] = useState(''); // নতুন লিমিট স্টেট
     const [showChart, setShowChart] = useState(true);
 
     const COLORS = ['#4cc9f0', '#4361ee', '#3f37c9', '#4895ef', '#560bad', '#f72585', '#b5179e'];
@@ -18,10 +19,11 @@ const DoctorStats = () => {
         const fetchStats = async () => {
             try {
                 let url = '';
+                // URL এ limit প্যারামিটার যোগ করা হয়েছে
                 if (activeSubView === 'doctor') {
-                    url = `http://localhost:5000/api/admin/doctor-stats?month=${month}&year=${year}`;
+                    url = `http://localhost:5000/api/admin/doctor-stats?month=${month}&year=${year}&limit=${limit}`;
                 } else if (activeSubView === 'disease') {
-                    url = `http://localhost:5000/api/admin/disease-stats?fromDate=${fromDate}&toDate=${toDate}`;
+                    url = `http://localhost:5000/api/admin/disease-stats?fromDate=${fromDate}&toDate=${toDate}&limit=${limit}`;
                 } else {
                     url = `http://localhost:5000/api/admin/stay-duration-stats?fromDate=${fromDate}&toDate=${toDate}`;
                 }
@@ -34,9 +36,8 @@ const DoctorStats = () => {
             }
         };
         fetchStats();
-    }, [activeSubView, month, year, fromDate, toDate]);
+    }, [activeSubView, month, year, fromDate, toDate, limit]); // ডিপেন্ডেন্সিতে limit যোগ করা হয়েছে
 
-    // ডাইনামিক ডেটা কি (Key) সেট করা
     const getDataKey = () => {
         if (activeSubView === 'doctor') return { x: 'doctor_name', y: 'total_appointments' };
         if (activeSubView === 'disease') return { x: 'disease_name', y: 'total_patients' };
@@ -48,16 +49,14 @@ const DoctorStats = () => {
 
     return (
         <div style={{ padding: '10px' }}>
-            {/* সাব-মেনু ট্যাব */}
             <div style={styles.tabContainer}>
                 <button onClick={() => setActiveSubView('doctor')} style={activeSubView === 'doctor' ? styles.tabActive : styles.tabInactive}>Doctor Wise</button>
                 <button onClick={() => setActiveSubView('disease')} style={activeSubView === 'disease' ? styles.tabActive : styles.tabInactive}>Disease Wise</button>
                 <button onClick={() => setActiveSubView('stay')} style={activeSubView === 'stay' ? styles.tabActive : styles.tabInactive}>Stay Duration</button>
             </div>
 
-            {/* ফিল্টার কন্ট্রোল */}
             <div style={styles.filterBox}>
-                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
                     {activeSubView === 'doctor' ? (
                         <>
                             <select value={month} onChange={(e) => setMonth(e.target.value)} style={styles.input}>
@@ -65,21 +64,35 @@ const DoctorStats = () => {
                             </select>
                             <input type="number" value={year} onChange={(e) => setYear(e.target.value)} style={{...styles.input, width: '80px'}} />
                         </>
-                    ) : (
+                    ) : activeSubView === 'disease' ? (
                         <>
                             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={styles.input} />
                             <span style={{color: '#666'}}>to</span>
                             <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={styles.input} />
                         </>
+                    ) : null}
+
+                    {/* Top N Input (Stay Duration এর জন্য প্রয়োজন নেই বলে হাইড রাখা হয়েছে) */}
+                    {(activeSubView === 'doctor' || activeSubView === 'disease') && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span style={{fontSize: '14px', color: '#555'}}>Top:</span>
+                            <input 
+                                type="number" 
+                                placeholder="All" 
+                                value={limit} 
+                                onChange={(e) => setLimit(e.target.value)} 
+                                style={{...styles.input, width: '60px'}} 
+                            />
+                        </div>
                     )}
                 </div>
+                
                 <div style={styles.toggleGroup}>
                     <button onClick={() => setShowChart(true)} style={showChart ? styles.toggleOn : styles.toggleOff}>Chart</button>
                     <button onClick={() => setShowChart(false)} style={!showChart ? styles.toggleOn : styles.toggleOff}>List</button>
                 </div>
             </div>
 
-            {/* কন্টেন্ট প্রদর্শন */}
             {stats.length === 0 ? (
                 <div style={styles.noData}>No records found for this selection.</div>
             ) : (
@@ -88,10 +101,10 @@ const DoctorStats = () => {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={stats}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                                <XAxis dataKey={keys.x} tick={{fontSize: 12}} />
+                                <XAxis dataKey={keys.x} tick={{fontSize: 10}} interval={0} angle={-15} textAnchor="end" height={60} />
                                 <YAxis tick={{fontSize: 12}} />
                                 <Tooltip cursor={{fill: '#f8f9fa'}} contentStyle={{borderRadius: '10px'}} />
-                                <Bar dataKey={keys.y} radius={[8, 8, 0, 0]} barSize={45}>
+                                <Bar dataKey={keys.y} radius={[8, 8, 0, 0]} barSize={40}>
                                     {stats.map((entry, index) => (
                                         <Cell key={index} fill={COLORS[index % COLORS.length]} />
                                     ))}
@@ -119,6 +132,7 @@ const DoctorStats = () => {
     );
 };
 
+// Styles (আপনার দেওয়া স্টাইল হুবহু রাখা হয়েছে)
 const styles = {
     tabContainer: { display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #f0f0f0', paddingBottom: '10px' },
     tabActive: { padding: '10px 18px', border: 'none', background: '#4cc9f0', color: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
