@@ -24,11 +24,11 @@ const upload = multer({ storage: storage });
 
 
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = "HMS2305"; // এটি একটি গোপন স্ট্রিং
+const JWT_SECRET = "HMS2305"; // This is a secret string
 // ২. মিডলওয়্যার ফাংশন (লগইন এপিআই-এর আগে বা পরে যেকোনো জায়গায়)
 const verifyToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    // চেক করুন হেডার আছে কি না এবং সেটি 'Bearer ' দিয়ে শুরু কি না
+    // Check if header exists and starts with 'Bearer'
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(403).json({ message: "No token provided or invalid format" });
     }
@@ -45,9 +45,16 @@ const verifyToken = (req, res, next) => {
 // --- API Routes ---
 // server.js
 
-app.get('/api/receptionist-users', async (req, res) => {
+// 'verifyToken' মিডলওয়্যারটি এখানে যুক্ত করা হয়েছে
+app.get('/api/receptionist-users', verifyToken, async (req, res) => {
     try {
-        // ডাটাবেস থেকে role_id = 2 (Receptionist) এর ডাটা আনা হচ্ছে
+        // ১. এখন আপনি চাইলে চেক করতে পারেন যে রিকোয়েস্টকারী কি আসলেই একজন Admin?
+        // (নিরাপত্তার খাতিরে সাধারণত একজন এডমিনই রিসেপশনিস্টদের লিস্ট দেখতে পারেন)
+        if (req.userRole !== 'Admin') {
+            return res.status(403).json({ message: "আপনার এই তথ্য দেখার অনুমতি নেই।" });
+        }
+
+        // ২. ডাটাবেস কোয়েরি
         const result = await pool.query(`
             SELECT u.user_id, u.name, u.email, u.phone_number, r.role_name 
             FROM users u 
@@ -55,52 +62,55 @@ app.get('/api/receptionist-users', async (req, res) => {
             WHERE u.role_id = 2
             ORDER BY u.user_id DESC
         `);
+
         res.json(result.rows);
     } catch (err) {
         console.error("API Error:", err.message);
-        res.status(500).json({ error: "ডাটা লোড করা যায়নি" });
+        res.status(500).json({ error: "ডাটা লোড করা যায়নি" });
     }
 });
 
-app.get('/users', async (req, res) => {
-  try {
-    const allUsers = await pool.query("SELECT * FROM users");
-    return res.json(allUsers.rows);
-  } catch (err) {
-    console.error(err.message);
-    return res.status(500).send("Server Error");
-  }
-});
+
+// app.get('/users', async (req, res) => {
+//   try {
+//     const allUsers = await pool.query("SELECT * FROM users");
+//     return res.json(allUsers.rows);
+//   } catch (err) {
+//     console.error(err.message);
+//     return res.status(500).send("Server Error");
+//   }
+// });
+
 app.post('/api/book-appointment', async (req, res) => {
-    const client = await pool.connect(); // কানেকশন শুরু
+    const client = await pool.connect(); // Start connection
     const { 
         name, phone_number, email, age, gender, 
         blood_group, date, appointment_time, doctor_id 
     } = req.body;
 
     try {
-        await client.query('BEGIN'); // ট্রানজ্যাকশন শুরু
+        await client.query('BEGIN'); // Start transaction
 
         await client.query(
             'CALL book_appointment_v3($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [name, phone_number, email, age, gender, blood_group, date, appointment_time, doctor_id]
         );
 
-        await client.query('COMMIT'); // সব ঠিক থাকলে সেভ হবে
+        await client.query('COMMIT'); // Save if everything is correct
         res.status(200).json({ success: true, message: "Success!" });
     } catch (err) {
-        await client.query('ROLLBACK'); // ভুল হলে আগের অবস্থায় ফেরত
+        await client.query('ROLLBACK');
         console.error("Booking Error:", err.message);
         res.status(500).json({ success: false, error: err.message });
     } finally {
-        client.release(); // কানেকশন ফ্রি করা
+        client.release(); // Free connection
     }
 });
 
-// ২. পেন্ডিং অ্যাপয়েন্টমেন্ট লিস্ট (রিসেপশনিস্ট ড্যাশবোর্ডের জন্য)
+// 2. Pending appointments list (for receptionist dashboard)
 app.get('/api/pending-appointments', verifyToken, async (req, res) => {
-    // ১. শুধুমাত্র রিসেপশনিস্ট কি না তা চেক করা
-    // আপনার ডাটাবেসে রোল যদি 'Receptionist' এভাবে থাকে
+    // 1. Check if user is Receptionist
+    // In database, role is 'Receptionist'
     if (req.userRole !== 'Receptionist') {
         return res.status(403).json({ 
             success: false, 
@@ -126,7 +136,7 @@ app.get('/api/pending-appointments', verifyToken, async (req, res) => {
              ORDER BY a.appointment_date ASC, a.appointment_time ASC`
         );
         
-        // ২. সাকসেসফুল রেসপন্স পাঠানো
+        // 2. Send successful response
         return res.json(result.rows);
     } catch (err) {
         console.error("Fetch Pending Error:", err.message);
@@ -136,7 +146,7 @@ app.get('/api/pending-appointments', verifyToken, async (req, res) => {
         });
     }
 });
-// নির্দিষ্ট ডক্টরের শিডিউল দেখার জন্য এপিআই
+// API to view specific doctor's schedule
 app.get('/api/doctor-availability/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -155,7 +165,7 @@ app.get('/api/doctor-availability/:id', async (req, res) => {
 });
 
 app.post('/api/createaccount', upload.single('image'), async (req, res) => {
-    // ১. ডাটাবেস ক্লায়েন্ট কানেকশন শুরু
+    // 1. Start database client connection
     const client = await pool.connect(); 
 
     try {
@@ -168,7 +178,7 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
         const specArr = specialization ? JSON.parse(specialization) : [];
         const qualArr = qualification ? JSON.parse(qualification) : [];
 
-        // ২. ট্রানজ্যাকশন শুরু
+        // 2. Start transaction
         await client.query('BEGIN'); 
 
         if (role === 'Doctor') {
@@ -302,69 +312,85 @@ app.get('/api/doctors-list', async (req, res) => {
         return res.status(500).json({ error: "Failed to fetch doctors" });
     }
 });
-
-app.post('/api/add-bulk-schedule', async (req, res) => {
-    const { doctor_id, startDate, endDate, selectedDays, hours_start, hours_end } = req.body;
-    
-    // ১. চেক করুন ইনপুট ডাটা ঠিকমতো আসছে কি না
-    console.log("--- DEBUG START ---");
-    console.log("Doctor ID:", doctor_id);
-    console.log("Date Range:", startDate, "to", endDate);
-    console.log("Selected Days:", selectedDays);
-
-    const daysMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
-    const selectedIndexes = selectedDays.map(d => daysMap[d]);
-
-    let current = new Date(startDate + "T00:00:00");
-    const last = new Date(endDate + "T00:00:00");
-
-    let matchFound = 0;
-    let insertCount = 0;
-
-    const client = await pool.connect();
+app.post('/api/add-bulk-schedule', verifyToken, async (req, res) => {
     try {
-        await client.query('BEGIN');
-
-        while (current <= last) {
-            if (selectedIndexes.includes(current.getDay())) {
-                matchFound++; // চেক করছি লুপের ভেতর দিন ম্যাচ করছে কি না
-                
-                const dateStr = current.toISOString().split('T')[0];
-                
-                const result = await client.query(
-                    `INSERT INTO schedules (doctor_id, date, day, hours_start, hours_end, is_active)
-                     VALUES ($1, $2, $3, $4, $5, 1)
-                     ON CONFLICT (doctor_id, date) DO NOTHING
-                     RETURNING *`,
-                    [doctor_id, dateStr, selectedDays.find(d => daysMap[d] === current.getDay()), hours_start, hours_end]
-                );
-
-                if (result.rowCount > 0) {
-                    insertCount++;
-                } else {
-                    console.log(`Skipped (Already Exists): ${dateStr}`);
-                }
-            }
-            current.setDate(current.getDate() + 1);
+        // ১. রোল চেক: শুধুমাত্র Doctor এই ডাটা ইনসার্ট করতে পারবে
+        // (আপনার সিস্টেমে যদি Admin-ও শিডিউল করতে পারে তবে এখানে || req.userRole !== 'Admin' যোগ করতে পারেন)
+        if (req.userRole !== 'Doctor') {
+            return res.status(403).json({ 
+                success: false, 
+                message: "আপনার শিডিউল তৈরি করার অনুমতি নেই। শুধুমাত্র ডাক্তাররা এটি করতে পারেন।" 
+            });
         }
 
-        await client.query('COMMIT');
+        const { doctor_id, startDate, endDate, selectedDays, hours_start, hours_end } = req.body;
         
-        console.log("Matches Found in Loop:", matchFound);
-        console.log("Successfully Inserted:", insertCount);
-        console.log("--- DEBUG END ---");
+        // ২. সিকিউরিটি চেক: লগ-ইন করা ডাক্তার কি নিজের ID-তেই শিডিউল দিচ্ছে? 
+        // (এটি অপশনাল, তবে দিলে ভালো যাতে এক ডাক্তার অন্যের শিডিউল পরিবর্তন না করতে পারে)
+        if (req.userId !== parseInt(doctor_id)) {
+             // যদি আপনার সিস্টেমে এডমিন অন্য ডাক্তারের শিডিউল করে তবে এই চেকটি বাদ দিন
+        }
 
-        res.json({ 
-            success: true, 
-            message: insertCount > 0 ? `${insertCount} days saved!` : `0 days saved. (Matches: ${matchFound}, check terminal)` 
-        });
+        console.log("--- DEBUG START ---");
+        console.log("Authorized Doctor ID:", req.userId);
+
+        const daysMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+        const selectedIndexes = selectedDays.map(d => daysMap[d]);
+
+        let current = new Date(startDate + "T00:00:00");
+        const last = new Date(endDate + "T00:00:00");
+
+        let matchFound = 0;
+        let insertCount = 0;
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            while (current <= last) {
+                if (selectedIndexes.includes(current.getDay())) {
+                    matchFound++; 
+                    
+                    const dateStr = current.toISOString().split('T')[0];
+                    
+                    const result = await client.query(
+                        `INSERT INTO schedules (doctor_id, date, day, hours_start, hours_end, is_active)
+                         VALUES ($1, $2, $3, $4, $5, 1)
+                         ON CONFLICT (doctor_id, date) DO NOTHING
+                         RETURNING *`,
+                        [doctor_id, dateStr, selectedDays.find(d => daysMap[d] === current.getDay()), hours_start, hours_end]
+                    );
+
+                    if (result.rowCount > 0) {
+                        insertCount++;
+                    } else {
+                        console.log(`Skipped (Already Exists): ${dateStr}`);
+                    }
+                }
+                current.setDate(current.getDate() + 1);
+            }
+
+            await client.query('COMMIT');
+            
+            console.log("Matches Found in Loop:", matchFound);
+            console.log("Successfully Inserted:", insertCount);
+            console.log("--- DEBUG END ---");
+
+            res.json({ 
+                success: true, 
+                message: insertCount > 0 ? `${insertCount} দিনের শিডিউল সফলভাবে সেভ হয়েছে!` : `০ দিন সেভ হয়েছে। (মিল পাওয়া গেছে: ${matchFound})` 
+            });
+
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err; 
+        } finally {
+            client.release();
+        }
 
     } catch (err) {
-        await client.query('ROLLBACK');
         console.error("DB ERROR:", err.message);
-        res.status(500).json({ error: err.message });
-    } finally {
-        client.release();
+        res.status(500).json({ success: false, error: "সার্ভার এরর: শিডিউল সেভ করা যায়নি।" });
     }
 });
 
@@ -494,29 +520,6 @@ app.put('/api/update-schedule-status', verifyToken, async (req, res) => {
     }
 });
 
-// ১. টোটাল সার্ভড সংখ্যা (যেটা আপনি দিয়েছেন)
-
-/*app.get('/api/doctor-appointment-counts/:id', async (req, res) => {
-    try {
-        const result = await pool.query(`
-            SELECT 
-                appointment_date::DATE as appointment_date, 
-                COUNT(*)::INT as daily_count 
-            FROM appointments a
-            JOIN service s ON a.service_id = s.service_id
-            JOIN doctor_serves ds ON s.service_id = ds.service_id
-            WHERE ds.user_id = $1
-            GROUP BY appointment_date::DATE
-            ORDER BY appointment_date DESC`, 
-            [req.params.id]
-        );
-        console.log("Data for ID " + req.params.id + ":", result.rows);
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send(err.message);
-    }
-});*/
 app.delete('/api/delete-user/:id', verifyToken, async (req, res) => {
     // ২. শুধুমাত্র অ্যাডমিনকে অনুমতি দেওয়া
     if (req.userRole !== 'Admin') {
@@ -671,46 +674,7 @@ app.post('/api/admin/approve-doctor/:id', verifyToken, async (req, res) => {
         client.release();
     }
 });
-/*
-app.delete('/api/delete-user/:id', verifyToken, async (req, res) => {
-    // ১. রোল চেক: শুধুমাত্র অ্যাডমিনকে ডিলিট করার অনুমতি দেওয়া
-    if (req.userRole !== 'Admin') {
-        return res.status(403).json({ 
-            success: false, 
-            message: "Access denied. Only Admins can delete users." 
-        });
-    }
 
-    const client = await pool.connect(); 
-
-    try {
-        const { id } = req.params;
-
-        // ২. ট্রানজ্যাকশন শুরু
-        await client.query('BEGIN'); 
-
-        // ৩. ডিলিট কমান্ড চালানো
-        const result = await client.query("DELETE FROM users WHERE user_id = $1", [id]);
-        
-        if (result.rowCount > 0) {
-            // ৪. ডিলিট সফল হলে কমিট
-            await client.query('COMMIT'); 
-            res.json({ success: true, message: "User deleted and archived successfully!" });
-        } else {
-            // ৫. ইউজার পাওয়া না গেলে রোলব্যাক
-            await client.query('ROLLBACK');
-            res.status(404).json({ error: "User not found" });
-        }
-    } catch (err) {
-        // ৬. এরর হলে রোলব্যাক
-        await client.query('ROLLBACK'); 
-        console.error("Delete Error:", err.message);
-        res.status(500).json({ error: "Internal Server Error", details: err.message });
-    } finally {
-        // ৭. ক্লায়েন্ট রিলিজ
-        client.release(); 
-    }
-});*/
 // ১. পেন্ডিং ডাক্তারকে সরাসরি ডিলিট/রিজেক্ট করার এপিআই
 // Pending doctor reject/delete korar jonno (Kono archive hobe na)
 app.delete('/api/admin/reject-doctor/:id', verifyToken, async (req, res) => {
@@ -832,7 +796,7 @@ app.post('/api/patients/start-service', verifyToken, async (req, res) => {
         client.release();
     }
 });
-
+/*
 app.get('/api/admin/doctor-stats', async (req, res) => {
     const { month, year, limit } = req.query;
     const finalLimit = limit ? parseInt(limit) : 1000; // ইনপুট না থাকলে ডিফল্ট ১০০০
@@ -846,46 +810,122 @@ app.get('/api/admin/doctor-stats', async (req, res) => {
         console.error(err.message);
         res.status(500).json({ error: "Internal Server Error" });
     }
-});
-
-app.post('/api/admit-patient', async (req, res) => {
-    const { 
-        name, phone, email, age, gender, blood_group, 
-        admission_date, disease_id, doctor_id, bed_no 
-    } = req.body;
-
-    const client = await pool.connect();
-
+});*/
+// ১. এডমিন ডক্টর স্ট্যাটাস এপিআই
+app.get('/api/admin/doctor-stats', verifyToken, async (req, res) => {
     try {
-        await client.query('BEGIN');
-
-        // ফাংশন কল করা হচ্ছে (১০টি প্যারামিটারসহ)
-        const result = await client.query(
-            `SELECT admit_patient_fn($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) as success`,
-            [name, phone, email, age, gender, blood_group, admission_date, disease_id, doctor_id, bed_no]
-        );
-
-        if (result.rows[0].success) {
-            await client.query('COMMIT');
-            res.json({ success: true, message: "Patient admitted and bed booked successfully!" });
-        } else {
-            throw new Error("Admission function returned false");
+        // ১. রোল চেক: শুধুমাত্র Admin এই ডাটা দেখতে পারবে
+        if (req.userRole !== 'Admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: "আপনার এই পরিসংখ্যান দেখার অনুমতি নেই।" 
+            });
         }
 
+        const { month, year, limit } = req.query;
+        
+        // ভ্যালিডেশন: মাস এবং বছর না থাকলে এরর দিবে
+        if (!month || !year) {
+            return res.status(400).json({ error: "Month and Year are required" });
+        }
+
+        const finalLimit = limit ? parseInt(limit) : 1000; 
+
+        // ২. ডাটাবেস ফাংশন কল (get_monthly_doctor_stats)
+        const result = await pool.query(
+            "SELECT * FROM get_monthly_doctor_stats($1, $2, $3)",
+            [parseInt(month), parseInt(year), finalLimit]
+        );
+
+        res.json(result.rows);
+
     } catch (err) {
-        await client.query('ROLLBACK');
-        console.error("Admission Error:", err.message);
-        res.status(500).json({ success: false, message: "Admission failed: " + err.message });
-    } finally {
-        client.release();
+        console.error("Doctor Stats API Error:", err.message);
+        res.status(500).json({ error: "সার্ভার এরর: ডক্টর পরিসংখ্যান লোড করা যায়নি।" });
     }
 });
 
-// ডাক্তার, রোগ এবং বেড ডাটা আনার জন্য প্রয়োজনীয় রুটগুলো:
-// ১. ডাক্তার এবং রোগের লিস্ট ড্যাশবোর্ডের জন্য পাঠানো
-app.get('/api/get-admission-data', async (req, res) => {
+// ২. এডমিন ডিজিজ স্ট্যাটাস এপিআই
+app.get('/api/admin/disease-stats', verifyToken, async (req, res) => {
     try {
-        // শুধুমাত্র সেই ইউজারদের নাম আনবে যারা 'doctors' টেবিলে আছে
+        // ১. রোল চেক: শুধুমাত্র Admin এই ডাটা দেখতে পারবে
+        if (req.userRole !== 'Admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: "আপনার এই পরিসংখ্যান দেখার অনুমতি নেই।" 
+            });
+        }
+
+        const { fromDate, toDate, limit } = req.query;
+
+        // ভ্যালিডেশন: ডেট রেঞ্জ না থাকলে এরর দিবে
+        if (!fromDate || !toDate) {
+            return res.status(400).json({ error: "Date range is required" });
+        }
+
+        const finalLimit = limit ? parseInt(limit) : 1000;
+
+        // ২. ডাটাবেস ফাংশন কল (get_disease_stats)
+        const result = await pool.query(
+            "SELECT * FROM get_disease_stats($1, $2, $3)",
+            [fromDate, toDate, finalLimit]
+        );
+
+        res.json(result.rows);
+
+    } catch (err) {
+        console.error("Disease Stats API Error:", err.message);
+        res.status(500).json({ error: "সার্ভার এরর: রোগ ভিত্তিক পরিসংখ্যান লোড করা যায়নি।" });
+    }
+});
+// ১. পেশেন্ট অ্যাডমিশন এপিআই (Receptionist Only)
+app.post('/api/admit-patient', verifyToken, async (req, res) => {
+    try {
+        // রোল চেক
+        if (req.userRole !== 'Receptionist') {
+            return res.status(403).json({ success: false, message: "আপনার এই কাজ করার অনুমতি নেই।" });
+        }
+
+        const { 
+            name, phone, email, age, gender, blood_group, 
+            admission_date, disease_id, doctor_id, bed_no 
+        } = req.body;
+
+        const client = await pool.connect();
+
+        try {
+            await client.query('BEGIN');
+
+            const result = await client.query(
+                `SELECT admit_patient_fn($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) as success`,
+                [name, phone, email, age, gender, blood_group, admission_date, disease_id, doctor_id, bed_no]
+            );
+
+            if (result.rows[0].success) {
+                await client.query('COMMIT');
+                res.json({ success: true, message: "Patient admitted and bed booked successfully!" });
+            } else {
+                throw new Error("Admission function returned false");
+            }
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err; // বাইরের ক্যাচ ব্লকে পাঠিয়ে দিবে
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error("Admission Error:", err.message);
+        res.status(500).json({ success: false, message: "Admission failed: " + err.message });
+    }
+});
+
+// ২. অ্যাডমিশন ডাটা (ডাক্তার ও রোগ) পাওয়ার এপিআই
+app.get('/api/get-admission-data', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'Receptionist') {
+            return res.status(403).json({ message: "অনুমতি নেই।" });
+        }
+
         const doctorsResult = await pool.query(`
             SELECT u.user_id, u.name 
             FROM users u 
@@ -893,7 +933,6 @@ app.get('/api/get-admission-data', async (req, res) => {
             ORDER BY u.name ASC
         `);
 
-        // admit_disease টেবিল থেকে সব রোগের নাম আনবে
         const diseasesResult = await pool.query(`
             SELECT disease_id, name 
             FROM admit_disease 
@@ -906,7 +945,91 @@ app.get('/api/get-admission-data', async (req, res) => {
         });
     } catch (err) {
         console.error("Error fetching admission data:", err.message);
-        res.status(500).json({ error: "Server error" });
+        res.status(500).json({ error: "সার্ভার এরর" });
+    }
+});
+
+// ৩. অ্যাভেইলবল বেড দেখার এপিআই
+app.get('/api/available-beds/:category', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'Receptionist') {
+            return res.status(403).json({ message: "অনুমতি নেই।" });
+        }
+
+        const { category } = req.params;
+        const bedsResult = await pool.query(`
+            SELECT bed_no 
+            FROM beds 
+            WHERE category = $1 AND status = 'Available'
+            ORDER BY bed_no ASC
+        `, [category]);
+
+        res.json(bedsResult.rows);
+    } catch (err) {
+        console.error("Error fetching beds:", err.message);
+        res.status(500).json({ error: "সার্ভার এরর" });
+    }
+});
+
+// ৪. পেশেন্ট রিলিজ করার এপিআই (Receptionist Only)
+app.post('/api/release-patient', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'Receptionist') {
+            return res.status(403).json({ success: false, message: "আপনার এই কাজ করার অনুমতি নেই।" });
+        }
+
+        const { admission_id, release_date } = req.body;
+        const client = await pool.connect();
+
+        try {
+            await client.query('BEGIN');
+
+            // ১. admission আপডেট
+            await client.query(
+                `UPDATE admission SET release_date = $1 WHERE admission_id = $2`,
+                [release_date, admission_id]
+            );
+
+            // ২. ALLOCATION আপডেট
+            const allocRes = await client.query(
+                `UPDATE ALLOCATION 
+                 SET TO_DATE = $1 
+                 WHERE admission_id = $2 
+                 RETURNING bed_no, FROM_DATE`,
+                [release_date, admission_id]
+            );
+
+            if (allocRes.rows.length > 0) {
+                const { bed_no, from_date } = allocRes.rows[0];
+
+                // ৩. bedsallocated আপডেট
+                await client.query(
+                    `UPDATE bedsallocated 
+                     SET end_date = $1 
+                     WHERE bed_no = $2 AND start_date = $3`,
+                    [release_date, bed_no, from_date]
+                );
+
+                // ৪. beds স্ট্যাটাস আপডেট
+                await client.query(
+                    `UPDATE beds SET status = 'Available' WHERE bed_no = $1`,
+                    [bed_no]
+                );
+            } else {
+                throw new Error("Admission ID-র বিপরীতে কোনো সচল বেড পাওয়া যায়নি।");
+            }
+
+            await client.query('COMMIT');
+            res.json({ success: true, message: "পেশেন্ট সফলভাবে রিলিজ হয়েছে এবং বেড এখন ফাঁকা।" });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error("Release Error:", err.message);
+        res.status(500).json({ success: false, message: "ব্যর্থ হয়েছে: " + err.message });
     }
 });
 
@@ -928,88 +1051,35 @@ app.get('/api/available-beds/:category', async (req, res) => {
     }
 });
 
-app.post('/api/release-patient', async (req, res) => {
-    const client = await pool.connect();
+// ২. স্টে ডিউরেশন স্ট্যাটাস এন্ডপয়েন্ট (Admin Only)
+app.get('/api/admin/stay-duration-stats', verifyToken, async (req, res) => {
     try {
-        const { admission_id, release_date } = req.body;
-        await client.query('BEGIN');
-
-        // ১. admission টেবিলে রিলিজ ডেট আপডেট
-        await client.query(
-            `UPDATE admission SET release_date = $1 WHERE admission_id = $2`,
-            [release_date, admission_id]
-        );
-
-        // ২. ALLOCATION টেবিল আপডেট এবং প্রয়োজনীয় ডাটা সংগ্রহ
-        const allocRes = await client.query(
-            `UPDATE ALLOCATION 
-             SET TO_DATE = $1 
-             WHERE admission_id = $2 
-             RETURNING bed_no, FROM_DATE`,
-            [release_date, admission_id]
-        );
-
-        if (allocRes.rows.length > 0) {
-            const { bed_no, from_date } = allocRes.rows[0];
-
-            // ৩. bedsallocated টেবিলে ডিলিট না করে end_date আপডেট (আপনার রিকোয়েস্ট অনুযায়ী)
-            // এখানে bed_no এবং start_date (from_date) ব্যবহার করে সঠিক রো টি খুঁজে বের করা হচ্ছে
-            await client.query(
-                `UPDATE bedsallocated 
-                 SET end_date = $1 
-                 WHERE bed_no = $2 AND start_date = $3`,
-                [release_date, bed_no, from_date]
-            );
-
-            // ৪. beds টেবিলের স্ট্যাটাস 'Available' করা
-            await client.query(
-                `UPDATE beds SET status = 'Available' WHERE bed_no = $1`,
-                [bed_no]
-            );
-        } else {
-            throw new Error("Admission ID-র বিপরীতে কোনো সচল বেড পাওয়া যায়নি।");
+        // ১. রোল চেক: শুধুমাত্র Admin এই ডাটা দেখতে পারবে
+        if (req.userRole !== 'Admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: "আপনার এই পরিসংখ্যান দেখার অনুমতি নেই।" 
+            });
         }
 
-        await client.query('COMMIT');
-        res.json({ success: true, message: "পেশেন্ট সফলভাবে রিলিজ হয়েছে এবং বেড এখন ফাঁকা।" });
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error(err.message);
-        res.status(500).json({ success: false, message: "ব্যর্থ হয়েছে: " + err.message });
-    } finally {
-        client.release();
-    }
-});
+        const { fromDate, toDate } = req.query;
 
-// ১. রোগ অনুযায়ী স্ট্যাটাস এন্ডপয়েন্ট
-app.get('/api/admin/disease-stats', async (req, res) => {
-    const { fromDate, toDate, limit } = req.query;
-    const finalLimit = limit ? parseInt(limit) : 1000;
-    try {
-        const result = await pool.query(
-            `SELECT * FROM get_disease_stats($1, $2, $3)`,
-            [fromDate, toDate, finalLimit]
-        );
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Database error while fetching disease stats" });
-    }
-});
+        // ভ্যালিডেশন: তারিখের সীমা না থাকলে এরর দিবে
+        if (!fromDate || !toDate) {
+            return res.status(400).json({ error: "Date range (fromDate, toDate) is required" });
+        }
 
-// ২. স্টে ডিউরেশন স্ট্যাটাস এন্ডপয়েন্ট
-app.get('/api/admin/stay-duration-stats', async (req, res) => {
-    const { fromDate, toDate } = req.query;
-    try {
-        // ফাংশন কল করা হচ্ছে
+        // ২. ডাটাবেস ফাংশন কল (get_stay_duration_stats)
         const result = await pool.query(
             `SELECT * FROM get_stay_duration_stats($1, $2)`,
             [fromDate, toDate]
         );
+
         res.json(result.rows);
+
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Database error while fetching duration stats" });
+        console.error("Stay Duration Stats Error:", err.message);
+        res.status(500).json({ error: "সার্ভার এরর: স্টে ডিউরেশন পরিসংখ্যান লোড করা যায়নি।" });
     }
 });
 

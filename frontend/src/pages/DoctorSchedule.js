@@ -5,11 +5,11 @@ const DoctorSchedule = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
 
-    // ১. লোকাল স্টোরেজ থেকে ডাটা এবং টোকেন নেওয়া
+    // ১. লোকাল স্টোরেজ থেকে ডাটা এবং টোকেন নেওয়া
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user'));
 
-    // ২. সিকিউরিটি চেক: টোকেন না থাকলে লগইন পেজে পাঠিয়ে দেওয়া
+    // ২. সিকিউরিটি চেক: টোকেন না থাকলে বা রোল Doctor না হলে রিডাইরেক্ট
     useEffect(() => {
         if (!token || user?.role !== 'Doctor') {
             navigate('/login');
@@ -40,12 +40,12 @@ const DoctorSchedule = () => {
         e.preventDefault();
 
         if (!scheduleData.startDate || !scheduleData.endDate || scheduleData.selectedDays.length === 0) {
-            return alert("Please fill in all fields.");
+            return alert("সবগুলো ঘর পূরণ করুন এবং অন্তত একটি দিন সিলেক্ট করুন।");
         }
 
         setLoading(true);
 
-        // ৩. পেলোড তৈরি (user.user_id নিশ্চিত করুন আপনার ডাটাবেজ অনুযায়ী)
+        // ৩. পেলোড তৈরি (ডাক্তারের আইডি সরাসরি ইউজার অবজেক্ট থেকে নেওয়া হচ্ছে)
         const payload = {
             doctor_id: user?.user_id || user?.id, 
             startDate: scheduleData.startDate,
@@ -61,34 +61,42 @@ const DoctorSchedule = () => {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` // ৪. টোকেন পাঠানো হচ্ছে
+                    'Authorization': `Bearer ${token}` // ৪. ভেরিফাই টোকেনের জন্য হেডার
                 },
                 body: JSON.stringify(payload)
             });
 
             const result = await response.json();
 
+            if (response.status === 401 || response.status === 403) {
+                alert("আপনার সেশন শেষ হয়ে গেছে অথবা আপনার এই কাজের অনুমতি নেই।");
+                navigate('/login');
+                return;
+            }
+
             if (response.ok) {
-                alert(result.message || "Schedule Generated Successfully!");
+                alert(result.message || "শিডিউল সফলভাবে তৈরি হয়েছে!");
                 navigate('/doctor-dashboard');
             } else {
-                alert("Error: " + (result.error || "Action failed"));
+                alert("Error: " + (result.error || result.message || "Action failed"));
             }
         } catch (error) {
             console.error("Fetch error:", error);
-            alert("Server connection failed!");
+            alert("সার্ভারের সাথে যোগাযোগ করা সম্ভব হচ্ছে না!");
         } finally {
             setLoading(false);
         }
     };
 
-    // যদি টোকেন না থাকে তবে রেন্ডার হবে না
-    if (!token) return null;
+    // টোকেন বা ইউজার না থাকলে কিছুই রেন্ডার হবে না (সিকিউরিটি)
+    if (!token || user?.role !== 'Doctor') return null;
 
     return (
         <div style={styles.container}>
             <div style={styles.formBox}>
-                <h2 style={{ color: '#2c3e50', marginBottom: '20px', textAlign: 'center' }}>Set Monthly Schedule</h2>
+                <h2 style={{ color: '#2c3e50', marginBottom: '20px', textAlign: 'center', fontSize: '20px' }}>
+                    Set Monthly Schedule
+                </h2>
                 <form onSubmit={handleSubmit}>
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <div style={styles.inputGroup}>
@@ -120,10 +128,16 @@ const DoctorSchedule = () => {
 
                     <label style={styles.label}>Shift Hours:</label>
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                        <input type="time" required style={styles.input}
-                            onChange={(e) => setScheduleData({ ...scheduleData, hours_start: e.target.value })} />
-                        <input type="time" required style={styles.input}
-                            onChange={(e) => setScheduleData({ ...scheduleData, hours_end: e.target.value })} />
+                        <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: '10px', color: '#888' }}>Start</span>
+                            <input type="time" required style={styles.input}
+                                onChange={(e) => setScheduleData({ ...scheduleData, hours_start: e.target.value })} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: '10px', color: '#888' }}>End</span>
+                            <input type="time" required style={styles.input}
+                                onChange={(e) => setScheduleData({ ...scheduleData, hours_end: e.target.value })} />
+                        </div>
                     </div>
 
                     <button type="submit" disabled={loading} style={{
@@ -142,7 +156,7 @@ const styles = {
     container: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f4f7f6', fontFamily: "'Poppins', sans-serif" },
     formBox: { background: '#fff', padding: '30px', borderRadius: '12px', width: '450px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' },
     inputGroup: { flex: 1, marginBottom: '15px' },
-    input: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd', boxSizing: 'border-box' },
+    input: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '14px' },
     dayContainer: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' },
     dayBadge: { padding: '8px 12px', border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: '0.3s' },
     button: { width: '100%', padding: '12px', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '10px', fontWeight: 'bold', fontSize: '16px' },

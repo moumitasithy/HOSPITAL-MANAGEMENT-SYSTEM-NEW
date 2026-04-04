@@ -15,7 +15,10 @@ import DoctorSchedule from './pages/DoctorSchedule';
 import ManageSchedule from './pages/ManageSchedule';
 import MedicalTests from './pages/MedicalTests';
 import ServePatient from './pages/ServePatient';
-
+import PendingDoctors from './pages/PendingDoctors';
+import DoctorList from './pages/ReceptionistList'; // আপনার ফাইল স্ট্রাকচার অনুযায়ী নাম চেক করে নিন
+import DoctorStats from './pages/DoctorStats';
+import AdmitPatientForm from './pages/AdmitPatientForm'; // ফাইল নেম চেক করে নিন
 // --- আপডেট করা প্রোটেক্টেড রাউট ফাংশন ---
 const ProtectedRoute = ({ children, allowedRole }) => {
     const userString = localStorage.getItem('user');
@@ -44,7 +47,6 @@ const ProtectedRoute = ({ children, allowedRole }) => {
         return <Navigate to="/login" replace />;
     }
 };
-
 function App() {
   return (
     <Router>
@@ -58,7 +60,7 @@ function App() {
         <Route path="/medicines" element={<Medicines />} />
         <Route path="/medical-tests" element={<MedicalTests />} />
         
-        {/* ৩. অ্যাডমিন ড্যাশবোর্ড */}
+        {/* অ্যাডমিন সেকশন */}
         <Route 
           path="/admin-dashboard" 
           element={
@@ -67,8 +69,32 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        <Route 
+          path="/pending-doctors" 
+          element={
+            <ProtectedRoute allowedRole="Admin">
+              <PendingDoctors />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/doctor-list" 
+          element={
+            <ProtectedRoute allowedRole="Admin">
+              <DoctorList />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/doctor-stats" 
+          element={
+            <ProtectedRoute allowedRole="Admin">
+              <DoctorStats />
+            </ProtectedRoute>
+          } 
+        />
 
-        {/* ১. রিসেপশনিস্ট ড্যাশবোর্ড */}
+        {/* রিসেপশনিস্ট সেকশন */}
         <Route 
           path="/receptionist-dashboard" 
           element={
@@ -77,8 +103,16 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        <Route 
+          path="/admit-patient" 
+          element={
+            <ProtectedRoute allowedRole="Receptionist">
+              <AdmitPatientForm />
+            </ProtectedRoute>
+          } 
+        />
 
-        {/* ২. ডাক্তার ড্যাশবোর্ড ও সংশ্লিষ্ট পেজগুলো */}
+        {/* ডাক্তার সেকশন */}
         <Route 
           path="/doctor-dashboard" 
           element={
@@ -87,7 +121,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-
         <Route 
           path="/doctor-schedule" 
           element={
@@ -96,7 +129,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-
         <Route 
           path="/manage-schedule" 
           element={
@@ -105,7 +137,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-
         <Route 
           path="/serve-patient" 
           element={
@@ -117,10 +148,9 @@ function App() {
 
         {/* ভুল ইউআরএল দিলে হোমে ব্যাক করবে */}
         <Route path="*" element={<Navigate to="/" />} />
-
       </Routes>
     </Router>
   )
 }
-
+// ফাইলের একদম শেষে এটি অবশ্যই থাকতে হবে
 export default App;

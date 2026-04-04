@@ -10,7 +10,7 @@ const DoctorStats = () => {
     const [year, setYear] = useState(2026);
     const [fromDate, setFromDate] = useState('2026-01-01');
     const [toDate, setToDate] = useState('2026-12-31');
-    const [limit, setLimit] = useState(''); // নতুন লিমিট স্টেট
+    const [limit, setLimit] = useState(''); 
     const [showChart, setShowChart] = useState(true);
 
     const COLORS = ['#4cc9f0', '#4361ee', '#3f37c9', '#4895ef', '#560bad', '#f72585', '#b5179e'];
@@ -18,8 +18,10 @@ const DoctorStats = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
+                // ১. লোকাল স্টোরেজ থেকে টোকেন নেওয়া
+                const token = localStorage.getItem('token');
+                
                 let url = '';
-                // URL এ limit প্যারামিটার যোগ করা হয়েছে
                 if (activeSubView === 'doctor') {
                     url = `http://localhost:5000/api/admin/doctor-stats?month=${month}&year=${year}&limit=${limit}`;
                 } else if (activeSubView === 'disease') {
@@ -28,7 +30,21 @@ const DoctorStats = () => {
                     url = `http://localhost:5000/api/admin/stay-duration-stats?fromDate=${fromDate}&toDate=${toDate}`;
                 }
 
-                const res = await fetch(url);
+                // ২. ফেচ রিকোয়েস্টে হেডার যোগ করা
+                const res = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`, // টোকেন পাঠানো হচ্ছে
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                // যদি আনঅথরাইজড হয় (যেমন টোকেন এক্সপায়ার হলে)
+                if (res.status === 401 || res.status === 403) {
+                    console.error("Unauthorized access. Please login again.");
+                    return;
+                }
+
                 const data = await res.json();
                 setStats(data || []);
             } catch (err) {
@@ -36,7 +52,7 @@ const DoctorStats = () => {
             }
         };
         fetchStats();
-    }, [activeSubView, month, year, fromDate, toDate, limit]); // ডিপেন্ডেন্সিতে limit যোগ করা হয়েছে
+    }, [activeSubView, month, year, fromDate, toDate, limit]);
 
     const getDataKey = () => {
         if (activeSubView === 'doctor') return { x: 'doctor_name', y: 'total_appointments' };
@@ -72,7 +88,6 @@ const DoctorStats = () => {
                         </>
                     ) : null}
 
-                    {/* Top N Input (Stay Duration এর জন্য প্রয়োজন নেই বলে হাইড রাখা হয়েছে) */}
                     {(activeSubView === 'doctor' || activeSubView === 'disease') && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                             <span style={{fontSize: '14px', color: '#555'}}>Top:</span>
@@ -132,7 +147,6 @@ const DoctorStats = () => {
     );
 };
 
-// Styles (আপনার দেওয়া স্টাইল হুবহু রাখা হয়েছে)
 const styles = {
     tabContainer: { display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #f0f0f0', paddingBottom: '10px' },
     tabActive: { padding: '10px 18px', border: 'none', background: '#4cc9f0', color: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },

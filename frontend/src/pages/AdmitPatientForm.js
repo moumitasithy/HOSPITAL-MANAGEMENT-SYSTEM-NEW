@@ -13,46 +13,60 @@ const AdmitPatientForm = ({ getHeaders }) => {
     });
 
     useEffect(() => {
-        // ডাক্তার এবং রোগের লিস্ট লোড করা
-        fetch('http://localhost:5000/api/get-admission-data', { headers: getHeaders() })
-            .then(res => res.json())
-            .then(data => {
-                setDoctors(data.doctors);
-                setDiseases(data.diseases);
-            });
-    }, []);
+        // ১. ডাক্তার এবং রোগের লিস্ট লোড করা (টোকেনসহ)
+        fetch('http://localhost:5000/api/get-admission-data', { 
+            headers: getHeaders() // এখান থেকে টোকেন যাচ্ছে
+        })
+        .then(res => {
+            if (res.status === 403) throw new Error("আপনার এই তথ্য দেখার অনুমতি নেই।");
+            return res.json();
+        })
+        .then(data => {
+            setDoctors(data.doctors || []);
+            setDiseases(data.diseases || []);
+        })
+        .catch(err => console.error("Fetch Error:", err.message));
+    }, [getHeaders]);
 
-    // ক্যাটাগরি চেঞ্জ হলে এভেইলএবল বেড আনা
+    // ২. ক্যাটাগরি চেঞ্জ হলে এভেইলএবল বেড আনা (টোকেনসহ)
     const handleCategoryChange = async (cat) => {
-    setSelectedCategory(cat);
-    if (!cat) {
-        setBeds([]);
-        return;
-    }
-    try {
-        const res = await fetch(`http://localhost:5000/api/available-beds/${cat}`, { headers: getHeaders() });
-        const data = await res.json();
-        // নিশ্চিত করুন যে ডাটাটি একটি অ্যারে
-        setBeds(Array.isArray(data) ? data : []);
-    } catch (err) {
-        console.error(err);
-        setBeds([]);
-    }
+        setSelectedCategory(cat);
+        if (!cat) {
+            setBeds([]);
+            return;
+        }
+        try {
+            const res = await fetch(`http://localhost:5000/api/available-beds/${cat}`, { 
+                headers: getHeaders() 
+            });
+            const data = await res.json();
+            setBeds(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error(err);
+            setBeds([]);
+        }
     };
 
+    // ৩. ফর্ম সাবমিট (টোকেনসহ POST রিকোয়েস্ট)
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const res = await fetch('http://localhost:5000/api/admit-patient', {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify(formData)
-        });
-        const data = await res.json();
-        if (data.success) {
-            alert(data.message);
-            window.location.reload();
-        } else {
-            alert(data.message);
+        try {
+            const res = await fetch('http://localhost:5000/api/admit-patient', {
+                method: 'POST',
+                headers: getHeaders(), // এখানে Content-Type এবং Authorization দুটোই আছে
+                body: JSON.stringify(formData)
+            });
+            
+            const data = await res.json();
+            if (data.success) {
+                alert("সাফল্য: " + data.message);
+                window.location.reload();
+            } else {
+                alert("ব্যর্থ: " + data.message);
+            }
+        } catch (err) {
+            console.error("Submit Error:", err);
+            alert("সার্ভার কানেকশনে সমস্যা হয়েছে।");
         }
     };
 
@@ -76,21 +90,17 @@ const AdmitPatientForm = ({ getHeaders }) => {
 
             <input type="date" required onChange={e => setFormData({...formData, admission_date: e.target.value})} style={styles.input}/>
 
-            <select required onChange={e => setFormData({...formData, disease_id: parseInt(e.target.value)})} 
-                 style={inputStyle}
->
+            <select required onChange={e => setFormData({...formData, disease_id: parseInt(e.target.value)})} style={styles.input}>
                  <option value="">Select Disease</option>
                 {diseases.map(d => (
                     <option key={d.disease_id} value={d.disease_id}>{d.name}</option>
                 ))}
             </select>
 
-            <select required onChange={e => setFormData({...formData, doctor_id: parseInt(e.target.value)})} 
-                  style={inputStyle}
->
+            <select required onChange={e => setFormData({...formData, doctor_id: parseInt(e.target.value)})} style={styles.input}>
                  <option value="">Select Doctor</option>
-                     {doctors.map(doc => (
-                 <option key={doc.user_id} value={doc.user_id}>{doc.name}</option>
+                 {doctors.map(doc => (
+                    <option key={doc.user_id} value={doc.user_id}>{doc.name}</option>
                  ))}
             </select>
 
@@ -101,9 +111,9 @@ const AdmitPatientForm = ({ getHeaders }) => {
 
             <select required onChange={e => setFormData({...formData, bed_no: e.target.value})} style={styles.input} disabled={!beds.length}>
                <option value="">{beds.length ? "Select Bed No" : "No beds available"}</option>
-               {Array.isArray(beds) && beds.map(b => (
-              <option key={b.bed_no} value={b.bed_no}>{b.bed_no}</option>
-              ))}
+               {beds.map(b => (
+                    <option key={b.bed_no} value={b.bed_no}>{b.bed_no}</option>
+               ))}
             </select>
 
             <button type="submit" style={styles.btn}>Confirm Admission</button>
@@ -113,7 +123,7 @@ const AdmitPatientForm = ({ getHeaders }) => {
 
 const styles = {
     formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' },
-    input: { padding: '10px', borderRadius: '5px', border: '1px solid #ccc' },
+    input: { padding: '10px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '14px' },
     btn: { gridColumn: 'span 2', padding: '12px', backgroundColor: '#004d40', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '5px', fontWeight: 'bold' }
 };
 
