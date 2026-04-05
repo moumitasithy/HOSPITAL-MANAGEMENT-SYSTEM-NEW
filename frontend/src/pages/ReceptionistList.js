@@ -4,12 +4,11 @@ const ReceptionistList = () => {
     const [receptionists, setReceptionists] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // ১. টোকেন গেট করার জন্য কমন ফাংশন
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token');
         return {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` // টোকেন পাঠানো হচ্ছে
+            'Authorization': `Bearer ${token}` 
         };
     };
 
@@ -67,7 +66,7 @@ const ReceptionistList = () => {
         try {
             const res = await fetch('http://localhost:5000/api/receptionist-users', {
                 method: 'GET',
-                headers: getAuthHeaders() // হেডার্স যোগ করা হলো
+                headers: getAuthHeaders() 
             });
             
             if (!res.ok) throw new Error("Unauthorized or Network error");
@@ -90,7 +89,7 @@ const ReceptionistList = () => {
         try {
             const res = await fetch(`http://localhost:5000/api/delete-user/${id}`, { 
                 method: 'DELETE',
-                headers: getAuthHeaders() // ডিলিট করার সময়ও টোকেন লাগবে
+                headers: getAuthHeaders()
             });
             
             if (res.ok) {

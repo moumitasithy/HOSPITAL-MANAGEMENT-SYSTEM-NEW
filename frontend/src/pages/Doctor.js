@@ -13,7 +13,6 @@ const Doctors = () => {
                 const response = await fetch('http://localhost:5000/api/doctors-list');
                 const data = await response.json();
 
-                // ডাটা কি আসলেই একটা লিস্ট (Array) কি না চেক করা
                 if (Array.isArray(data)) {
                     setDoctorsList(data);
                 } else {
@@ -27,7 +26,7 @@ const Doctors = () => {
             }
         };
 
-        fetchDoctors(); // এই লাইনটি আপনার কোডে মিসিং ছিল, এটি অবশ্যই যোগ করুন!
+        fetchDoctors();
     }, []);
     if (loading) return <h2 style={{ textAlign: 'center', marginTop: '50px' }}>Loading Doctors...</h2>;
 
@@ -65,7 +64,7 @@ const Doctors = () => {
                         <div style={{ flex: 1 }}>
                             <h2 style={{ color: '#0097a7', margin: '0 0 10px 0' }}>{doc.name}</h2>
 
-                            {/* Qualification দেখানোর জন্য নতুন লাইন */}
+                            {}
                             <p style={{ margin: '5px 0', fontSize: '16px', color: '#333' }}>
                                 <b>{doc.qualifications || 'MBBS'}</b>
                             </p>
@@ -102,7 +101,7 @@ const Doctors = () => {
     );
 };
 
-// স্টাইল অবজেক্ট (নিশ্চিত করুন এটি আপনার ফাইলে আছে)
+
 const styles = {
     container: { padding: '40px 20px', backgroundColor: '#f0f2f5', minHeight: '100vh' },
     card: { display: 'flex', backgroundColor: 'white', borderRadius: '15px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '800px', margin: '20px auto', gap: '20px', alignItems: 'center' },

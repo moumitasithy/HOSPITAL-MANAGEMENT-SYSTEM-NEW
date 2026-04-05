@@ -23,7 +23,6 @@ const Appointment = () => {
         doctorId: '' 
     });
 
-    // ডাক্তার সিলেক্ট করলে শিডিউল আসবে
     useEffect(() => {
         if (formData.doctorId) {
             fetch(`http://localhost:5000/api/doctor-availability/${formData.doctorId}`)
@@ -37,7 +36,7 @@ const Appointment = () => {
         if (!searchTerm) return alert("Please type something to search!");
         setLoading(true);
         try {
-            // আপনার নতুন সার্চ এপিআই কল করুন
+            
             const response = await fetch(`http://localhost:5000/api/search-doctors-service?query=${searchTerm}`);
             const data = await response.json();
             setDoctorServices(data);
@@ -72,7 +71,7 @@ const handleSubmit = async (e) => {
                 email: formData.email,
                 age: formData.age,
                 gender: formData.gender,
-                blood_group: formData.blood_group, // এই লাইনটি যোগ করা হয়েছে
+                blood_group: formData.blood_group, 
                 date: formData.date,
                 appointment_time: formData.appointment_time,
                 doctor_id: formData.doctorId 
@@ -93,7 +92,7 @@ const handleSubmit = async (e) => {
         setLoading(false);
     }
 };
-    // ... (Styles remains the same)
+   
     const styles = {
         container: {
             minHeight: '100vh', width: '100%',

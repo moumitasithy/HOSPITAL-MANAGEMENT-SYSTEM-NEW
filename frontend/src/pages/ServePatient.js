@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 const ServePatient = () => {
-    // ১. স্টেট ম্যানেজমেন্ট
+    
     const [idInput, setIdInput] = useState('');
     const [currentDate, setCurrentDate] = useState('');
     const [currentServiceId, setCurrentServiceId] = useState(null);
@@ -12,13 +12,13 @@ const ServePatient = () => {
         name: '', phone_number: '', email: '', age: '', gender: '', blood_group: '', patient_type: ''
     });
 
-    // ডাইনামিক লিস্ট স্টেটসমূহ
+    
     const [history, setHistory] = useState([{ condition: '', current_meds: '' }]);
     const [diagnoses, setDiagnoses] = useState([{ disease: '', severity: 'Mild' }]);
     const [medicines, setMedicines] = useState([{ name: '', duration: '', schedule: '0+0+0', timing: 'After Meal' }]);
     const [tests, setTests] = useState([{ test_name: '' }]);
 
-    // ২. টোকেন এবং ইউজার ডাটা নেওয়া
+    
     const token = localStorage.getItem('token');
     const storedUser = JSON.parse(localStorage.getItem('user'));
     const doctorId = storedUser?.user_id || storedUser?.id;
@@ -29,13 +29,13 @@ const ServePatient = () => {
         setCurrentDate(today.toLocaleDateString('en-GB', options));
     }, []);
 
-    // ৩. টোকেন সহ হেডারের কমন ফাংশন
+    
     const getAuthHeaders = useCallback(() => ({
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
     }), [token]);
 
-    // ৪. পেশেন্ট সার্চ এবং সার্ভিস শুরু (Token Added)
+    
     const fetchPatientData = async () => {
         if (!idInput) return;
         if (!doctorId || !token) {
@@ -69,10 +69,9 @@ const ServePatient = () => {
         }
     };
 
-    // ৫. প্রিসক্রিপশন সেভ করার ফাংশন (Token Added)
-   // ৫. প্রিসক্রিপশন সেভ করার সম্পূর্ণ ফাংশন (Merged & Verified)
+   
 const handleSavePrescription = async () => {
-    // সেফটি চেক: সার্ভিস আইডি বা পেশেন্ট আইডি না থাকলে সেভ হবে না
+   
     if (!currentServiceId) {
         return alert("❌ No active service found! Please search for a patient and start service first.");
     }
@@ -82,34 +81,32 @@ const handleSavePrescription = async () => {
 
     setLoading(true);
 
-    // সব ডাটা একত্রে পেলোড হিসেবে তৈরি করা
+   
     const prescriptionPayload = {
         service_id: currentServiceId,
-        patient_id: idInput, // medical_histories টেবিলের জন্য এটি বাধ্যতামূলক
-        description,         // চিফ কমপ্লেইন্টস
-        advice,              // পরামর্শ
-        history,             // পাষ্ট মেডিকেল হিস্ট্রি লিস্ট
-        diagnoses,           // ডায়াগনোসিস লিস্ট
-        medicines,           // ওষুধের লিস্ট
-        tests                // টেস্টের লিস্ট
+        patient_id: idInput, 
+        description,         
+        advice,              
+        history,             
+        diagnoses,           
+        medicines,           
+        tests                
     };
 
     try {
         const res = await fetch(`http://localhost:5000/api/patients/save-prescription`, {
             method: 'POST',
-            headers: getAuthHeaders(), // এখানে টোকেন এবং কন্টেন্ট-টাইপ আছে
+            headers: getAuthHeaders(),
             body: JSON.stringify(prescriptionPayload)
         });
 
         const data = await res.json();
 
         if (res.ok && data.success) {
-            // সফল হলে মেসেজ দেখাবে এবং সব ফিল্ড ক্লিয়ার করে দিবে
             alert("✅ Prescription, Medical History, and Diagnosis saved successfully!");
             clearAllFields();
             setIdInput(''); 
         } else {
-            // সার্ভার থেকে কোনো এরর আসলে তা দেখাবে
             alert("❌ Save Failed: " + (data.message || data.error || "Unknown error occurred"));
         }
     } catch (err) {
@@ -143,7 +140,7 @@ const handleSavePrescription = async () => {
         <div style={styles.container}>
             <h2 style={{ textAlign: 'center', color: '#2c3e50', marginBottom: '20px' }}>DOCTOR'S PRESCRIPTION PANEL</h2>
 
-            {/* --- SECTION 1: Patient Header --- */}
+            {}
             <div style={styles.topBar}>
                 <div style={styles.dateBox}>
                     <strong>Date:</strong> {currentDate} <br/>

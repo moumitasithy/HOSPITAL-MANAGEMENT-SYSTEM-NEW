@@ -30,18 +30,13 @@ const Login = () => {
             const result = await response.json();
 
             if (response.ok) {
-                // ১. টোকেন এবং ইউজার ডাটা আলাদা করা
-                const { token, user } = result; 
                 
-                // ২. টোকেন সেভ করা (এটি আপনার রিকোয়েস্ট হেডারে পাঠাতে হবে)
-                localStorage.setItem('token', token);
-                
-                // ৩. ইউজার অবজেক্ট সেভ করা (রোল চেক করার জন্য)
+                const { token, user } = result;                        
+                localStorage.setItem('token', token);                
                 localStorage.setItem('user', JSON.stringify(user));
                 
                 alert(`Welcome ${user.name}!`);
                 
-                // ৪. রোল অনুযায়ী অটোমেটিক রিডাইরেক্ট
                 if (user.role === 'Doctor') {
                     navigate('/doctor-dashboard');
                 } 
@@ -56,7 +51,6 @@ const Login = () => {
                 }
                 
             } else {
-                // ব্যাকএন্ডের catch ব্লক থেকে আসা এরর মেসেজ দেখানো
                 alert(result.message || "Login failed! Please check your credentials.");
             }
         } catch (error) {
@@ -64,7 +58,7 @@ const Login = () => {
         }
     };
 
-    // ... (আপনার আগের styles অংশটি একই থাকবে)
+    
     const styles = {
         container: {
             height: '100vh', width: '100%',

@@ -8,27 +8,22 @@ const ManageSchedule = () => {
     const [schedules, setSchedules] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // ১. লোকাল স্টোরেজ থেকে ডাটা নেওয়া
+
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user'));
-    
-    // ইউজার আইডি আলাদা করে নেওয়া যাতে dependency লুপ না হয়
     const userId = user?.user_id || user?.id;
 
-    // টোকেন না থাকলে লগইন পেজে পাঠানো
     useEffect(() => {
         if (!token) {
             navigate('/login');
         }
     }, [token, navigate]);
 
-    // ২. হেডারের জন্য মেমোয়াইজড ফাংশন
     const getAuthHeaders = useCallback(() => ({
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
     }), [token]);
 
-    // ৩. ডাটা ফেচ করার ফাংশন
     const fetchSchedules = useCallback(async () => {
         if (!userId || !token) return;
         
@@ -49,16 +44,14 @@ const ManageSchedule = () => {
         } finally {
             setLoading(false);
         }
-    }, [userId, token, getAuthHeaders]); // এখানে 'user' এর বদলে 'userId' ব্যবহার করা হয়েছে
+    }, [userId, token, getAuthHeaders]); 
 
-    // প্রথমবার লোড হওয়ার সময় কল হবে
     useEffect(() => {
         if (token && userId) {
             fetchSchedules();
         }
     }, [token, userId, fetchSchedules]);
 
-    // ৪. স্ট্যাটাস পরিবর্তন করার ফাংশন
     const toggleStatus = async (id, currentStatus) => {
         const newStatus = currentStatus === 1 ? 0 : 1;
         try {
@@ -69,7 +62,6 @@ const ManageSchedule = () => {
             });
             
             if (response.ok) {
-                // স্টেট সরাসরি আপডেট করা ভালো যাতে পুনরায় ডাটা ফেচ করতে না হয় (Optimistic UI)
                 setSchedules(prev => 
                     prev.map(sch => sch.schedule_id === id ? { ...sch, is_active: newStatus } : sch)
                 );
@@ -82,7 +74,6 @@ const ManageSchedule = () => {
         }
     };
 
-    // স্টাইল অবজেক্ট (আপনার কোড থেকে নেওয়া)
     const styles = {
         container: {
             minHeight: '100vh',

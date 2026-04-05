@@ -3,19 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import PendingDoctors from './PendingDoctors';
 import DoctorsList from './DoctorsList';
 import ReceptionistList from './ReceptionistList';
-import DoctorStats from './DoctorStats'; // নতুন ইম্পোর্ট
+import DoctorStats from './DoctorStats'; 
 
 const AdminDashboard = () => {
     const [view, setView] = useState('pending');
     const navigate = useNavigate();
 
-    // ১. লোকাল স্টোরেজ থেকে ডাটা নেওয়া
     const user = JSON.parse(localStorage.getItem('user'));
     const token = localStorage.getItem('token');
 
-    // ২. সিকিউরিটি চেক (Auth Guard)
+    
     useEffect(() => {
-        // যদি টোকেন না থাকে অথবা ইউজারের রোল 'Admin' না হয়
+        
         if (!token || user?.role !== 'Admin') {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
@@ -23,11 +22,11 @@ const AdminDashboard = () => {
         }
     }, [token, user, navigate]);
 
-    // ৩. লগআউট ফাংশন
+    
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login'; // পুরো স্টেট ক্লিন করার জন্য
+        window.location.href = '/login'; 
     };
 
     const styles = {
@@ -100,7 +99,7 @@ const AdminDashboard = () => {
         }
     };
 
-    // যদি টোকেন না থাকে তবে কিছুই রেন্ডার করবে না (রিডাইরেক্ট হওয়ার আগ পর্যন্ত)
+    
     if (!token || user?.role !== 'Admin') return null;
 
     return (
@@ -115,7 +114,7 @@ const AdminDashboard = () => {
                 <button style={styles.sideBtn(view === 'doctors')} onClick={() => setView('doctors')}>Doctors List</button>
                 <button style={styles.sideBtn(view === 'receptionists')} onClick={() => setView('receptionists')}>Receptionists</button>
                 
-                {/* স্ট্যাটিস্টিকস বাটন */}
+                {}
                 <button style={styles.sideBtn(view === 'statistics')} onClick={() => setView('statistics')}>Appointment Stats</button>
                 
                 <button style={styles.logoutBtn} onClick={handleLogout}>Logout</button>
@@ -128,12 +127,12 @@ const AdminDashboard = () => {
                             {view === 'statistics' ? 'APPOINTMENT STATISTICS' : `${view.toUpperCase()} MANAGEMENT`}
                         </h2>
                         
-                        {/* ভিউ অনুযায়ী কম্পোনেন্ট রেন্ডারিং */}
+                        {}
                         {view === 'pending' && <PendingDoctors />}
                         {view === 'doctors' && <DoctorsList />}
                         {view === 'receptionists' && <ReceptionistList />}
                         
-                        {/* নতুন কম্পোনেন্ট লোড হবে এখানে */}
+                        {}
                         {view === 'statistics' && <DoctorStats />}
                     </div>
                 </div>

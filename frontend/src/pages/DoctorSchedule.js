@@ -5,11 +5,9 @@ const DoctorSchedule = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
 
-    // ১. লোকাল স্টোরেজ থেকে ডাটা এবং টোকেন নেওয়া
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user'));
 
-    // ২. সিকিউরিটি চেক: টোকেন না থাকলে বা রোল Doctor না হলে রিডাইরেক্ট
     useEffect(() => {
         if (!token || user?.role !== 'Doctor') {
             navigate('/login');
@@ -40,12 +38,11 @@ const DoctorSchedule = () => {
         e.preventDefault();
 
         if (!scheduleData.startDate || !scheduleData.endDate || scheduleData.selectedDays.length === 0) {
-            return alert("সবগুলো ঘর পূরণ করুন এবং অন্তত একটি দিন সিলেক্ট করুন।");
+            return alert("fill all and select at least 1 days");
         }
 
         setLoading(true);
 
-        // ৩. পেলোড তৈরি (ডাক্তারের আইডি সরাসরি ইউজার অবজেক্ট থেকে নেওয়া হচ্ছে)
         const payload = {
             doctor_id: user?.user_id || user?.id, 
             startDate: scheduleData.startDate,
@@ -61,7 +58,7 @@ const DoctorSchedule = () => {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` // ৪. ভেরিফাই টোকেনের জন্য হেডার
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(payload)
             });
@@ -69,26 +66,25 @@ const DoctorSchedule = () => {
             const result = await response.json();
 
             if (response.status === 401 || response.status === 403) {
-                alert("আপনার সেশন শেষ হয়ে গেছে অথবা আপনার এই কাজের অনুমতি নেই।");
+                alert("session end or access denied");
                 navigate('/login');
                 return;
             }
 
             if (response.ok) {
-                alert(result.message || "শিডিউল সফলভাবে তৈরি হয়েছে!");
+                alert(result.message || "successfully entered schedule!");
                 navigate('/doctor-dashboard');
             } else {
                 alert("Error: " + (result.error || result.message || "Action failed"));
             }
         } catch (error) {
             console.error("Fetch error:", error);
-            alert("সার্ভারের সাথে যোগাযোগ করা সম্ভব হচ্ছে না!");
+            alert("failed to connect to the server!");
         } finally {
             setLoading(false);
         }
     };
 
-    // টোকেন বা ইউজার না থাকলে কিছুই রেন্ডার হবে না (সিকিউরিটি)
     if (!token || user?.role !== 'Doctor') return null;
 
     return (

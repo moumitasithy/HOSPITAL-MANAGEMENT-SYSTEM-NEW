@@ -5,13 +5,13 @@ const PendingDoctorList = () => {
     const [doctors, setDoctors] = useState([]);
     const [selectedDoc, setSelectedDoc] = useState(null);
 
-    // ১. লোকাল স্টোরেজ থেকে টোকেনটি নেওয়া
+    
     const token = localStorage.getItem('token'); 
 
-    // ২. কমন হেডার ফাংশন (কোড ছোট করার জন্য)
+   
     const getHeaders = () => ({
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` // টোকেন পাঠানো হচ্ছে
+        'Authorization': `Bearer ${token}`
     });
 
     const fetchPending = async () => {
@@ -73,8 +73,7 @@ const PendingDoctorList = () => {
         }
     };
 
-    // ... (বাকি JSX এবং Styles আপনার আগের কোডেই ঠিক আছে)
-
+   
     return (
         <div style={styles.container}>
             <h2 style={styles.title}>PENDING LIST</h2>
@@ -114,7 +113,7 @@ const PendingDoctorList = () => {
                             <p><strong>Phone:</strong> {selectedDoc.phone_number}</p>
                             <p><strong>Consultation Fee:</strong> {selectedDoc.consultation_fee} BDT</p>
 
-                            {/* একাধিক নাম দেখানোর লজিক */}
+                            {}
                             
                             <p>
                                 <strong>Specializations:</strong> {

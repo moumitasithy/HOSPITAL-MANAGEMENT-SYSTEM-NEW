@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 const CreateAccount = () => {
     const navigate = useNavigate();
     
-    // ডাটাবেস থেকে আসা লিস্ট রাখার জন্য স্টেট
+    
     const [specList, setSpecList] = useState([]);
     const [qualList, setQualList] = useState([]);
     const [role, setRole] = useState('Doctor');
@@ -17,11 +17,11 @@ const CreateAccount = () => {
         phone_number: '',
         password: '',
         consultation_fee: '',
-        specialization: [], // এখানে সিলেক্ট করা ID গুলোর অ্যারে থাকবে
-        qualification: []   // এখানে সিলেক্ট করা ID গুলোর অ্যারে থাকবে
+        specialization: [], 
+        qualification: []   
     });
 
-    // ডাটাবেস থেকে স্পেশালাইজেশন এবং কোয়ালিফিকেশন লোড করা
+   
     useEffect(() => {
         const fetchLists = async () => {
             try {
@@ -44,7 +44,7 @@ const CreateAccount = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // মাল্টিপল চেকবক্স হ্যান্ডেল করার ফাংশন
+   
     const handleCheckboxChange = (e, type) => {
         const value = parseInt(e.target.value);
         const isChecked = e.target.checked;
@@ -71,7 +71,6 @@ const CreateAccount = () => {
 
         if (role === 'Doctor') {
             data.append('consultation_fee', formData.consultation_fee || 0);
-            // অ্যারেগুলোকে স্ট্রিং হিসেবে পাঠানো হচ্ছে যাতে ব্যাকএন্ডে JSON.parse করা যায়
             data.append('specialization', JSON.stringify(formData.specialization));
             data.append('qualification', JSON.stringify(formData.qualification));
             if (image) data.append('image', image);
@@ -119,7 +118,7 @@ const CreateAccount = () => {
                     </select>
                 </div>
 
-                {/* শুধুমাত্র Doctor সিলেক্ট করলে নিচের অপশনগুলো আসবে */}
+                {}
                 {role === 'Doctor' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                         <input style={styles.input} name="consultation_fee" type="number" placeholder="Consultation Fee (BDT)" required onChange={handleChange} />

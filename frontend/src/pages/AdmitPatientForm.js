@@ -13,12 +13,12 @@ const AdmitPatientForm = ({ getHeaders }) => {
     });
 
     useEffect(() => {
-        // ১. ডাক্তার এবং রোগের লিস্ট লোড করা (টোকেনসহ)
+        
         fetch('http://localhost:5000/api/get-admission-data', { 
-            headers: getHeaders() // এখান থেকে টোকেন যাচ্ছে
+            headers: getHeaders() 
         })
         .then(res => {
-            if (res.status === 403) throw new Error("আপনার এই তথ্য দেখার অনুমতি নেই।");
+            if (res.status === 403) throw new Error("Access Denied");
             return res.json();
         })
         .then(data => {
@@ -28,7 +28,6 @@ const AdmitPatientForm = ({ getHeaders }) => {
         .catch(err => console.error("Fetch Error:", err.message));
     }, [getHeaders]);
 
-    // ২. ক্যাটাগরি চেঞ্জ হলে এভেইলএবল বেড আনা (টোকেনসহ)
     const handleCategoryChange = async (cat) => {
         setSelectedCategory(cat);
         if (!cat) {
@@ -47,13 +46,12 @@ const AdmitPatientForm = ({ getHeaders }) => {
         }
     };
 
-    // ৩. ফর্ম সাবমিট (টোকেনসহ POST রিকোয়েস্ট)
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             const res = await fetch('http://localhost:5000/api/admit-patient', {
                 method: 'POST',
-                headers: getHeaders(), // এখানে Content-Type এবং Authorization দুটোই আছে
+                headers: getHeaders(), 
                 body: JSON.stringify(formData)
             });
             

@@ -5,7 +5,6 @@ const DoctorStats = () => {
     const [activeSubView, setActiveSubView] = useState('doctor');
     const [stats, setStats] = useState([]);
     
-    // ফিল্টার স্টেট
     const [month, setMonth] = useState(new Date().getMonth() + 1);
     const [year, setYear] = useState(2026);
     const [fromDate, setFromDate] = useState('2026-01-01');
@@ -18,9 +17,7 @@ const DoctorStats = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                // ১. লোকাল স্টোরেজ থেকে টোকেন নেওয়া
-                const token = localStorage.getItem('token');
-                
+                const token = localStorage.getItem('token');                
                 let url = '';
                 if (activeSubView === 'doctor') {
                     url = `http://localhost:5000/api/admin/doctor-stats?month=${month}&year=${year}&limit=${limit}`;
@@ -30,16 +27,15 @@ const DoctorStats = () => {
                     url = `http://localhost:5000/api/admin/stay-duration-stats?fromDate=${fromDate}&toDate=${toDate}`;
                 }
 
-                // ২. ফেচ রিকোয়েস্টে হেডার যোগ করা
+                
                 const res = await fetch(url, {
                     method: 'GET',
                     headers: {
-                        'Authorization': `Bearer ${token}`, // টোকেন পাঠানো হচ্ছে
+                        'Authorization': `Bearer ${token}`, 
                         'Content-Type': 'application/json'
                     }
                 });
 
-                // যদি আনঅথরাইজড হয় (যেমন টোকেন এক্সপায়ার হলে)
                 if (res.status === 401 || res.status === 403) {
                     console.error("Unauthorized access. Please login again.");
                     return;

@@ -24,11 +24,11 @@ const upload = multer({ storage: storage });
 
 
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = "HMS2305"; // This is a secret string
-// ২. মিডলওয়্যার ফাংশন (লগইন এপিআই-এর আগে বা পরে যেকোনো জায়গায়)
+const JWT_SECRET = "HMS2305";
+
 const verifyToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    // Check if header exists and starts with 'Bearer'
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(403).json({ message: "No token provided or invalid format" });
     }
@@ -42,19 +42,15 @@ const verifyToken = (req, res, next) => {
         next();
     });
 };
-// --- API Routes ---
-// server.js
 
-// 'verifyToken' মিডলওয়্যারটি এখানে যুক্ত করা হয়েছে
+
+
 app.get('/api/receptionist-users', verifyToken, async (req, res) => {
     try {
-        // ১. এখন আপনি চাইলে চেক করতে পারেন যে রিকোয়েস্টকারী কি আসলেই একজন Admin?
-        // (নিরাপত্তার খাতিরে সাধারণত একজন এডমিনই রিসেপশনিস্টদের লিস্ট দেখতে পারেন)
         if (req.userRole !== 'Admin') {
-            return res.status(403).json({ message: "আপনার এই তথ্য দেখার অনুমতি নেই।" });
+            return res.status(403).json({ message: "Access denied।" });
         }
 
-        // ২. ডাটাবেস কোয়েরি
         const result = await pool.query(`
             SELECT u.user_id, u.name, u.email, u.phone_number, r.role_name 
             FROM users u 
@@ -66,7 +62,7 @@ app.get('/api/receptionist-users', verifyToken, async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error("API Error:", err.message);
-        res.status(500).json({ error: "ডাটা লোড করা যায়নি" });
+        res.status(500).json({ error: "Data could not be loaded" });
     }
 });
 
@@ -82,35 +78,34 @@ app.get('/api/receptionist-users', verifyToken, async (req, res) => {
 // });
 
 app.post('/api/book-appointment', async (req, res) => {
-    const client = await pool.connect(); // Start connection
+    const client = await pool.connect(); 
     const { 
         name, phone_number, email, age, gender, 
         blood_group, date, appointment_time, doctor_id 
     } = req.body;
 
     try {
-        await client.query('BEGIN'); // Start transaction
+        await client.query('BEGIN'); 
 
         await client.query(
             'CALL book_appointment_v3($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [name, phone_number, email, age, gender, blood_group, date, appointment_time, doctor_id]
         );
 
-        await client.query('COMMIT'); // Save if everything is correct
+        await client.query('COMMIT'); 
         res.status(200).json({ success: true, message: "Success!" });
     } catch (err) {
         await client.query('ROLLBACK');
         console.error("Booking Error:", err.message);
         res.status(500).json({ success: false, error: err.message });
     } finally {
-        client.release(); // Free connection
+        client.release(); 
     }
 });
 
-// 2. Pending appointments list (for receptionist dashboard)
+
 app.get('/api/pending-appointments', verifyToken, async (req, res) => {
-    // 1. Check if user is Receptionist
-    // In database, role is 'Receptionist'
+    
     if (req.userRole !== 'Receptionist') {
         return res.status(403).json({ 
             success: false, 
@@ -136,7 +131,6 @@ app.get('/api/pending-appointments', verifyToken, async (req, res) => {
              ORDER BY a.appointment_date ASC, a.appointment_time ASC`
         );
         
-        // 2. Send successful response
         return res.json(result.rows);
     } catch (err) {
         console.error("Fetch Pending Error:", err.message);
@@ -146,7 +140,7 @@ app.get('/api/pending-appointments', verifyToken, async (req, res) => {
         });
     }
 });
-// API to view specific doctor's schedule
+
 app.get('/api/doctor-availability/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -165,7 +159,6 @@ app.get('/api/doctor-availability/:id', async (req, res) => {
 });
 
 app.post('/api/createaccount', upload.single('image'), async (req, res) => {
-    // 1. Start database client connection
     const client = await pool.connect(); 
 
     try {
@@ -178,7 +171,6 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
         const specArr = specialization ? JSON.parse(specialization) : [];
         const qualArr = qualification ? JSON.parse(qualification) : [];
 
-        // 2. Start transaction
         await client.query('BEGIN'); 
 
         if (role === 'Doctor') {
@@ -187,28 +179,23 @@ app.post('/api/createaccount', upload.single('image'), async (req, res) => {
                 [name, email, phone_number, hashedPassword, consultation_fee, image_url, JSON.stringify(specArr), JSON.stringify(qualArr)]
             );
             
-            // ৩. কাজ সফল হলে কমিট
             await client.query('COMMIT'); 
             return res.status(201).json({ success: true, message: "Pending for Admin Approval" });
         }
 
-        // বাকিদের জন্য (Receptionist/Admin)
         await client.query("CALL create_account($1, $2, $3, $4, $5, $6, $7, $8, $9)", [
             name, email, phone_number, hashedPassword, role, consultation_fee || 0, image_url, specArr, qualArr
         ]);
 
-        // ৪. কাজ সফল হলে কমিট
         await client.query('COMMIT'); 
         res.status(201).json({ success: true, message: "Account created" });
 
     } catch (err) {
-        // ৫. কোনো ভুল হলে সব রোলব্যাক (আগের অবস্থায় ফেরত)
         await client.query('ROLLBACK'); 
         console.error("Transaction Error:", err.message);
         res.status(500).json({ error: "Account creation failed", details: err.message });
 
     } finally {
-        // ৬. ক্লায়েন্ট রিলিজ করা (অবশ্যই করতে হবে)
         client.release(); 
     }
 });
@@ -216,7 +203,6 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        // ১. প্রথমে শুধু ইমেইল দিয়ে ইউজারকে খুঁজে বের করা (পাসওয়ার্ডসহ)
         const result = await pool.query(
             `SELECT u.user_id, u.name, u.password, r.role_name as role 
              FROM users u 
@@ -228,18 +214,15 @@ app.post('/api/login', async (req, res) => {
         if (result.rows.length > 0) {
             const user = result.rows[0];
 
-            // ২. Bcrypt দিয়ে পাসওয়ার্ড চেক করা (পাসওয়ার্ড বনাম হ্যাশ)
             const isMatch = await bcrypt.compare(password, user.password);
 
             if (isMatch) {
-                // ৩. পাসওয়ার্ড মিললে JWT টোকেন তৈরি করা
                 const token = jwt.sign(
                     { id: user.user_id, role: user.role }, 
                     JWT_SECRET, 
                     { expiresIn: '30m' }
                 );
 
-                // ৪. ফ্রন্টএন্ডে ডাটা পাঠানো
                 return res.status(200).json({
                     success: true,
                     token: token,
@@ -250,14 +233,12 @@ app.post('/api/login', async (req, res) => {
                     }
                 });
             } else {
-                // পাসওয়ার্ড না মিললে
                 return res.status(401).json({ 
                     success: false, 
                     message: "Invalid email or password" 
                 });
             }
         } else {
-            // ইমেইল না পাওয়া গেলে
             return res.status(401).json({ 
                 success: false, 
                 message: "Invalid email or password" 
@@ -272,7 +253,7 @@ app.post('/api/login', async (req, res) => {
         });
     }
 });
-// ৫. ডক্টর শিডিউল দেখা (রিসেপশনিস্ট এবং পেশেন্টদের জন্য)
+
 app.get('/api/doctor-schedules', async (req, res) => {
     try {
         const result = await pool.query(
@@ -314,21 +295,15 @@ app.get('/api/doctors-list', async (req, res) => {
 });
 app.post('/api/add-bulk-schedule', verifyToken, async (req, res) => {
     try {
-        // ১. রোল চেক: শুধুমাত্র Doctor এই ডাটা ইনসার্ট করতে পারবে
-        // (আপনার সিস্টেমে যদি Admin-ও শিডিউল করতে পারে তবে এখানে || req.userRole !== 'Admin' যোগ করতে পারেন)
         if (req.userRole !== 'Doctor') {
             return res.status(403).json({ 
                 success: false, 
-                message: "আপনার শিডিউল তৈরি করার অনুমতি নেই। শুধুমাত্র ডাক্তাররা এটি করতে পারেন।" 
+                message: "Access denied. Data only for doctors" 
             });
         }
 
         const { doctor_id, startDate, endDate, selectedDays, hours_start, hours_end } = req.body;
-        
-        // ২. সিকিউরিটি চেক: লগ-ইন করা ডাক্তার কি নিজের ID-তেই শিডিউল দিচ্ছে? 
-        // (এটি অপশনাল, তবে দিলে ভালো যাতে এক ডাক্তার অন্যের শিডিউল পরিবর্তন না করতে পারে)
         if (req.userId !== parseInt(doctor_id)) {
-             // যদি আপনার সিস্টেমে এডমিন অন্য ডাক্তারের শিডিউল করে তবে এই চেকটি বাদ দিন
         }
 
         console.log("--- DEBUG START ---");
@@ -378,7 +353,7 @@ app.post('/api/add-bulk-schedule', verifyToken, async (req, res) => {
 
             res.json({ 
                 success: true, 
-                message: insertCount > 0 ? `${insertCount} দিনের শিডিউল সফলভাবে সেভ হয়েছে!` : `০ দিন সেভ হয়েছে। (মিল পাওয়া গেছে: ${matchFound})` 
+                message: insertCount > 0 ? `${insertCount} day-schedule successfully saved for` : `০ days saved. match found ${matchFound})` 
             });
 
         } catch (err) {
@@ -390,12 +365,11 @@ app.post('/api/add-bulk-schedule', verifyToken, async (req, res) => {
 
     } catch (err) {
         console.error("DB ERROR:", err.message);
-        res.status(500).json({ success: false, error: "সার্ভার এরর: শিডিউল সেভ করা যায়নি।" });
+        res.status(500).json({ success: false, error: "server error: schedule could not be changed" });
     }
 });
 
 
-// মেডিসিন এপিআই
 app.get('/api/medicines', async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM medicines ORDER BY name ASC");
@@ -408,7 +382,6 @@ app.get('/api/medicines', async (req, res) => {
 app.post('/api/buy-medicine', async (req, res) => {
     const { medicine_id, buy_quantity } = req.body;
     try {
-        // স্টকে পর্যাপ্ত মেডিসিন আছে কি না চেক করা এবং আপডেট করা
         const result = await pool.query(
             "UPDATE medicines SET quantity_instock = quantity_instock - $1 WHERE medicine_id = $2 AND quantity_instock >= $1 RETURNING *",
             [buy_quantity, medicine_id]
@@ -422,7 +395,7 @@ app.post('/api/buy-medicine', async (req, res) => {
         return res.status(500).json({ error: err.message });
     }
 });
- //ড্রপডাউন ডাটা (Specializations & Qualifications)
+
 app.get('/api/specializations', async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM specializations ORDER BY specialization_name ASC");
@@ -438,13 +411,12 @@ app.get('/api/qualifications', async (req, res) => {
 });
 
 
-// Medical Tests list poyar API
 app.get('/api/test_details', async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM test_details ORDER BY test_id ASC");
-        res.json(result.rows); // result.rows একটি অ্যারে পাঠায়
+        res.json(result.rows); 
     } catch (err) {
-        res.status(500).json([]); // এরর হলে খালি অ্যারে পাঠান
+        res.status(500).json([]);
     }
 });
 
@@ -465,12 +437,10 @@ app.get('/api/search-doctors-service', async (req, res) => {
     }
 });
 app.get('/api/doctor-manage-schedules/:id', verifyToken, async (req, res) => {
-    // শুধুমাত্র ডক্টর কি না চেক করা
     if (req.userRole !== 'Doctor') {
         return res.status(403).json({ error: "Access denied. Only doctors can view their schedules." });
     }
 
-    // নিজের আইডি ছাড়া অন্য কারও আইডি চেক করার চেষ্টা করলে ব্লক করা
     if (req.userId !== parseInt(req.params.id)) {
         return res.status(403).json({ error: "Access denied. You can only view your own schedule." });
     }
@@ -486,7 +456,6 @@ app.get('/api/doctor-manage-schedules/:id', verifyToken, async (req, res) => {
     }
 });
 app.put('/api/update-schedule-status', verifyToken, async (req, res) => {
-    // রোল চেক
     if (req.userRole !== 'Doctor') {
         return res.status(403).json({ error: "Access denied. Only doctors can update status." });
     }
@@ -494,7 +463,6 @@ app.put('/api/update-schedule-status', verifyToken, async (req, res) => {
     const { schedule_id, is_active } = req.body;
 
     try {
-        // অতিরিক্ত নিরাপত্তা: নিশ্চিত করা যে এই শিডিউলটি আসলেই এই ডাক্তারের কি না
         const checkOwnership = await pool.query(
             "SELECT doctor_id FROM schedules WHERE schedule_id = $1", 
             [schedule_id]
@@ -508,7 +476,6 @@ app.put('/api/update-schedule-status', verifyToken, async (req, res) => {
             return res.status(403).json({ error: "Unauthorized! You can only update your own schedule." });
         }
 
-        // সব ঠিক থাকলে আপডেট করা
         await pool.query(
             "UPDATE schedules SET is_active = $1 WHERE schedule_id = $2",
             [is_active, schedule_id]
@@ -521,7 +488,6 @@ app.put('/api/update-schedule-status', verifyToken, async (req, res) => {
 });
 
 app.delete('/api/delete-user/:id', verifyToken, async (req, res) => {
-    // ২. শুধুমাত্র অ্যাডমিনকে অনুমতি দেওয়া
     if (req.userRole !== 'Admin') {
         return res.status(403).json({ success: false, message: "Access denied. Only Admins can delete users." });
     }
@@ -530,7 +496,7 @@ app.delete('/api/delete-user/:id', verifyToken, async (req, res) => {
     const client = await pool.connect(); 
 
     try {
-        await client.query('BEGIN'); // ৩. ট্রানজ্যাকশন শুরু
+        await client.query('BEGIN'); 
 
         const result = await client.query("DELETE FROM users WHERE user_id = $1", [id]);
         
@@ -551,10 +517,7 @@ app.delete('/api/delete-user/:id', verifyToken, async (req, res) => {
 });
 
 
-// ১. ক্যানসেল এপিআই
-
 app.delete('/api/cancel-appointment/:id', verifyToken, async (req, res) => {
-    // ১. সুনির্দিষ্ট রোল চেক (শুধুমাত্র Receptionist)
     if (req.userRole !== 'Receptionist') {
         return res.status(403).json({ 
             success: false, 
@@ -566,10 +529,7 @@ app.delete('/api/cancel-appointment/:id', verifyToken, async (req, res) => {
 
     try {
         await client.query('BEGIN'); 
-
-        // ২. ক্যানসেল প্রোসিডিউর কল করা
         await client.query('CALL cancel_appointment_v3($1)', [req.params.id]);
-
         await client.query('COMMIT'); 
         res.json({ success: true, message: "Appointment Cancelled and Archived!" });
 
@@ -584,7 +544,6 @@ app.delete('/api/cancel-appointment/:id', verifyToken, async (req, res) => {
 });
 
 app.put('/api/confirm-appointment/:id', verifyToken, async (req, res) => {
-    // ১. সুনির্দিষ্ট রোল চেক (শুধুমাত্র Receptionist)
     if (req.userRole !== 'Receptionist') {
         return res.status(403).json({ 
             success: false, 
@@ -598,7 +557,6 @@ app.put('/api/confirm-appointment/:id', verifyToken, async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // প্রসিডিউর কল করা
         await client.query('CALL confirm_appointment_v3($1, $2)', [req.params.id, receptionist_id]);
 
         await client.query('COMMIT');
@@ -606,7 +564,6 @@ app.put('/api/confirm-appointment/:id', verifyToken, async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error("Confirmation Error:", err.message);
-        // ডাটাবেসের RAISE EXCEPTION এখানে ক্যাচ হয়ে ৪00 এরর দিবে
         res.status(400).json({ error: err.message }); 
     } finally {
         client.release();
@@ -614,9 +571,7 @@ app.put('/api/confirm-appointment/:id', verifyToken, async (req, res) => {
 });
 
 
-// ১. পেন্ডিং ডাক্তারদের লিস্ট পাওয়ার এপিআই
 app.get('/api/admin/pending-doctors',verifyToken, async (req, res) => {
-    // ১. সুনির্দিষ্ট রোল চেক (শুধুমাত্র Admin)
     if (req.userRole !== 'Admin') {
         return res.status(403).json({ 
             success: false, 
@@ -629,11 +584,10 @@ app.get('/api/admin/pending-doctors',verifyToken, async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error("Fetch Pending Error:", err.message);
-        res.status(500).json({ error: "পেন্ডিং লিস্ট লোড করতে সমস্যা হয়েছে" });
+        res.status(500).json({ error: "problem loeading pending list" });
     }
 });
 app.post('/api/admin/approve-doctor/:id', verifyToken, async (req, res) => {
-    // ১. সুনির্দিষ্ট রোল চেক (শুধুমাত্র Admin)
     if (req.userRole !== 'Admin') {
         return res.status(403).json({ 
             success: false, 
@@ -650,12 +604,11 @@ app.post('/api/admin/approve-doctor/:id', verifyToken, async (req, res) => {
         const pendingResult = await client.query("SELECT * FROM pending_doctors WHERE pending_id = $1", [id]);
         if (pendingResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: "ডাক্তারের তথ্য পাওয়া যায়নি" });
+            return res.status(404).json({ error: "doctors info could not be fetched" });
         }
 
         const d = pendingResult.rows[0];
 
-        // ডাটাবেস থেকে আসা JSON/String ডাটাকে Array তে রূপান্তর
         const spec = Array.isArray(d.specialization) ? d.specialization : JSON.parse(d.specialization || '[]');
         const qual = Array.isArray(d.qualification) ? d.qualification : JSON.parse(d.qualification || '[]');
 
@@ -675,10 +628,8 @@ app.post('/api/admin/approve-doctor/:id', verifyToken, async (req, res) => {
     }
 });
 
-// ১. পেন্ডিং ডাক্তারকে সরাসরি ডিলিট/রিজেক্ট করার এপিআই
-// Pending doctor reject/delete korar jonno (Kono archive hobe na)
+
 app.delete('/api/admin/reject-doctor/:id', verifyToken, async (req, res) => {
-    // ১. সুনির্দিষ্ট রোল চেক (শুধুমাত্র Admin)
     if (req.userRole !== 'Admin') {
         return res.status(403).json({ 
             success: false, 
@@ -688,8 +639,7 @@ app.delete('/api/admin/reject-doctor/:id', verifyToken, async (req, res) => {
 
     try {
         const { id } = req.params;
-        
-        // Shudhu pending_doctors table theke delete korbe
+
         const result = await pool.query("DELETE FROM pending_doctors WHERE pending_id = $1", [id]);
         
         if (result.rowCount > 0) {
@@ -704,7 +654,6 @@ app.delete('/api/admin/reject-doctor/:id', verifyToken, async (req, res) => {
 });
 
 app.get('/api/admin/pending-details/:id', verifyToken, async (req, res) => {
-    // ১. শুধুমাত্র অ্যাডমিন কি না চেক করা
     if (req.userRole !== 'Admin') {
         return res.status(403).json({ 
             success: false, 
@@ -719,8 +668,6 @@ app.get('/api/admin/pending-details/:id', verifyToken, async (req, res) => {
         if (isNaN(doctorId)) {
             return res.status(400).json({ error: "Invalid ID" });
         }
-
-        // ২. পেন্ডিং টেবিল থেকে ডাটা রিট্রিভ
         const result = await pool.query("SELECT * FROM pending_doctors WHERE pending_id = $1", [doctorId]);
         
         if (result.rows.length === 0) {
@@ -729,14 +676,12 @@ app.get('/api/admin/pending-details/:id', verifyToken, async (req, res) => {
 
         const doc = result.rows[0];
 
-        // ৩. JSONB আইডি থেকে নাম রিট্রিভ করা (Specializations & Qualifications)
         const specIds = Array.isArray(doc.specialization) ? doc.specialization : [];
         const qualIds = Array.isArray(doc.qualification) ? doc.qualification : [];
 
         const specs = await pool.query("SELECT specialization_name FROM specializations WHERE specialization_id = ANY($1::int[])", [specIds]);
         const quals = await pool.query("SELECT qualification_name FROM qualification WHERE qualification_id = ANY($1::int[])", [qualIds]);
 
-        // ৪. ডিটেইলস ডাটা পাঠানো
         res.json({
             ...doc,
             specialization_names: specs.rows.map(r => r.specialization_name),
@@ -748,9 +693,9 @@ app.get('/api/admin/pending-details/:id', verifyToken, async (req, res) => {
         res.status(500).json({ error: "Server Error" });
     }
 });
-// এই একটি API দিয়েই এখন আপনার কাজ হয়ে যাবে
+
 app.post('/api/patients/start-service', verifyToken, async (req, res) => {
-    // ১. শুধুমাত্র ডক্টর কি না তা চেক করা (verifyToken থেকে প্রাপ্ত Role)
+
     if (req.userRole !== 'Doctor') {
         return res.status(403).json({ 
             success: false, 
@@ -764,14 +709,12 @@ app.post('/api/patients/start-service', verifyToken, async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // ২. পেশেন্টের তথ্য চেক (পেশেন্ট বিদ্যমান কি না নিশ্চিত করা)
         const patientRes = await client.query("SELECT * FROM patients WHERE patient_id = $1", [patient_id]);
         if (patientRes.rows.length === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({ error: "Patient not found" });
         }
 
-        // ৩. ডেটাবেস ফাংশন কল করা (SELECT function_name)
         const funcRes = await client.query(
             "SELECT start_patient_service_fn($1, $2) as service_id",
             [patient_id, doctor_id]
@@ -780,12 +723,10 @@ app.post('/api/patients/start-service', verifyToken, async (req, res) => {
         const newServiceId = funcRes.rows[0].service_id;
 
         await client.query('COMMIT');
-
-        // ৪. ফ্রন্টএন্ডে রেসপন্স পাঠানো
         res.json({
             success: true,
-            patient: patientRes.rows[0], // পেশেন্টের ডিটেইলস (নাম, বয়স ইত্যাদি)
-            service_id: newServiceId     // নতুন তৈরি হওয়া সার্ভিস আইডি
+            patient: patientRes.rows[0],
+            service_id: newServiceId    
         });
 
     } catch (err) {
@@ -796,42 +737,23 @@ app.post('/api/patients/start-service', verifyToken, async (req, res) => {
         client.release();
     }
 });
-/*
-app.get('/api/admin/doctor-stats', async (req, res) => {
-    const { month, year, limit } = req.query;
-    const finalLimit = limit ? parseInt(limit) : 1000; // ইনপুট না থাকলে ডিফল্ট ১০০০
-    try {
-        const result = await pool.query(
-            "SELECT * FROM get_monthly_doctor_stats($1, $2, $3)",
-            [parseInt(month), parseInt(year), finalLimit]
-        );
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});*/
-// ১. এডমিন ডক্টর স্ট্যাটাস এপিআই
+
 app.get('/api/admin/doctor-stats', verifyToken, async (req, res) => {
     try {
-        // ১. রোল চেক: শুধুমাত্র Admin এই ডাটা দেখতে পারবে
         if (req.userRole !== 'Admin') {
             return res.status(403).json({ 
                 success: false, 
-                message: "আপনার এই পরিসংখ্যান দেখার অনুমতি নেই।" 
+                message: "Access denied. Data only for admins." 
             });
         }
 
         const { month, year, limit } = req.query;
-        
-        // ভ্যালিডেশন: মাস এবং বছর না থাকলে এরর দিবে
         if (!month || !year) {
             return res.status(400).json({ error: "Month and Year are required" });
         }
 
         const finalLimit = limit ? parseInt(limit) : 1000; 
 
-        // ২. ডাটাবেস ফাংশন কল (get_monthly_doctor_stats)
         const result = await pool.query(
             "SELECT * FROM get_monthly_doctor_stats($1, $2, $3)",
             [parseInt(month), parseInt(year), finalLimit]
@@ -841,31 +763,28 @@ app.get('/api/admin/doctor-stats', verifyToken, async (req, res) => {
 
     } catch (err) {
         console.error("Doctor Stats API Error:", err.message);
-        res.status(500).json({ error: "সার্ভার এরর: ডক্টর পরিসংখ্যান লোড করা যায়নি।" });
+        res.status(500).json({ error: "server error: Doctor_stats could not be loaded" });
     }
 });
 
-// ২. এডমিন ডিজিজ স্ট্যাটাস এপিআই
+
 app.get('/api/admin/disease-stats', verifyToken, async (req, res) => {
     try {
-        // ১. রোল চেক: শুধুমাত্র Admin এই ডাটা দেখতে পারবে
         if (req.userRole !== 'Admin') {
             return res.status(403).json({ 
                 success: false, 
-                message: "আপনার এই পরিসংখ্যান দেখার অনুমতি নেই।" 
+                message: "Access denied. Data only for admins." 
             });
         }
 
         const { fromDate, toDate, limit } = req.query;
 
-        // ভ্যালিডেশন: ডেট রেঞ্জ না থাকলে এরর দিবে
         if (!fromDate || !toDate) {
             return res.status(400).json({ error: "Date range is required" });
         }
 
         const finalLimit = limit ? parseInt(limit) : 1000;
 
-        // ২. ডাটাবেস ফাংশন কল (get_disease_stats)
         const result = await pool.query(
             "SELECT * FROM get_disease_stats($1, $2, $3)",
             [fromDate, toDate, finalLimit]
@@ -875,15 +794,14 @@ app.get('/api/admin/disease-stats', verifyToken, async (req, res) => {
 
     } catch (err) {
         console.error("Disease Stats API Error:", err.message);
-        res.status(500).json({ error: "সার্ভার এরর: রোগ ভিত্তিক পরিসংখ্যান লোড করা যায়নি।" });
+        res.status(500).json({ error: "server error: Doctor_stats could not be loaded" });
     }
 });
-// ১. পেশেন্ট অ্যাডমিশন এপিআই (Receptionist Only)
+
 app.post('/api/admit-patient', verifyToken, async (req, res) => {
     try {
-        // রোল চেক
         if (req.userRole !== 'Receptionist') {
-            return res.status(403).json({ success: false, message: "আপনার এই কাজ করার অনুমতি নেই।" });
+            return res.status(403).json({ success: false, message: "Access Denied" });
         }
 
         const { 
@@ -909,7 +827,7 @@ app.post('/api/admit-patient', verifyToken, async (req, res) => {
             }
         } catch (err) {
             await client.query('ROLLBACK');
-            throw err; // বাইরের ক্যাচ ব্লকে পাঠিয়ে দিবে
+            throw err; 
         } finally {
             client.release();
         }
@@ -919,11 +837,10 @@ app.post('/api/admit-patient', verifyToken, async (req, res) => {
     }
 });
 
-// ২. অ্যাডমিশন ডাটা (ডাক্তার ও রোগ) পাওয়ার এপিআই
 app.get('/api/get-admission-data', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'Receptionist') {
-            return res.status(403).json({ message: "অনুমতি নেই।" });
+            return res.status(403).json({ message: "access denied।" });
         }
 
         const doctorsResult = await pool.query(`
@@ -945,15 +862,14 @@ app.get('/api/get-admission-data', verifyToken, async (req, res) => {
         });
     } catch (err) {
         console.error("Error fetching admission data:", err.message);
-        res.status(500).json({ error: "সার্ভার এরর" });
+        res.status(500).json({ error: "server error" });
     }
 });
 
-// ৩. অ্যাভেইলবল বেড দেখার এপিআই
 app.get('/api/available-beds/:category', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'Receptionist') {
-            return res.status(403).json({ message: "অনুমতি নেই।" });
+            return res.status(403).json({ message: "access denied" });
         }
 
         const { category } = req.params;
@@ -967,15 +883,14 @@ app.get('/api/available-beds/:category', verifyToken, async (req, res) => {
         res.json(bedsResult.rows);
     } catch (err) {
         console.error("Error fetching beds:", err.message);
-        res.status(500).json({ error: "সার্ভার এরর" });
+        res.status(500).json({ error: "server error" });
     }
 });
 
-// ৪. পেশেন্ট রিলিজ করার এপিআই (Receptionist Only)
 app.post('/api/release-patient', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'Receptionist') {
-            return res.status(403).json({ success: false, message: "আপনার এই কাজ করার অনুমতি নেই।" });
+            return res.status(403).json({ success: false, message: "Access Denied." });
         }
 
         const { admission_id, release_date } = req.body;
@@ -984,13 +899,11 @@ app.post('/api/release-patient', verifyToken, async (req, res) => {
         try {
             await client.query('BEGIN');
 
-            // ১. admission আপডেট
             await client.query(
                 `UPDATE admission SET release_date = $1 WHERE admission_id = $2`,
                 [release_date, admission_id]
             );
 
-            // ২. ALLOCATION আপডেট
             const allocRes = await client.query(
                 `UPDATE ALLOCATION 
                  SET TO_DATE = $1 
@@ -1002,7 +915,6 @@ app.post('/api/release-patient', verifyToken, async (req, res) => {
             if (allocRes.rows.length > 0) {
                 const { bed_no, from_date } = allocRes.rows[0];
 
-                // ৩. bedsallocated আপডেট
                 await client.query(
                     `UPDATE bedsallocated 
                      SET end_date = $1 
@@ -1010,17 +922,16 @@ app.post('/api/release-patient', verifyToken, async (req, res) => {
                     [release_date, bed_no, from_date]
                 );
 
-                // ৪. beds স্ট্যাটাস আপডেট
                 await client.query(
                     `UPDATE beds SET status = 'Available' WHERE bed_no = $1`,
                     [bed_no]
                 );
             } else {
-                throw new Error("Admission ID-র বিপরীতে কোনো সচল বেড পাওয়া যায়নি।");
+                throw new Error("No available beds against the Admission ID");
             }
 
             await client.query('COMMIT');
-            res.json({ success: true, message: "পেশেন্ট সফলভাবে রিলিজ হয়েছে এবং বেড এখন ফাঁকা।" });
+            res.json({ success: true, message: "Patient released and bed is available" });
         } catch (err) {
             await client.query('ROLLBACK');
             throw err;
@@ -1029,11 +940,10 @@ app.post('/api/release-patient', verifyToken, async (req, res) => {
         }
     } catch (err) {
         console.error("Release Error:", err.message);
-        res.status(500).json({ success: false, message: "ব্যর্থ হয়েছে: " + err.message });
+        res.status(500).json({ success: false, message: "failed: " + err.message });
     }
 });
 
-// ২. ক্যাটাগরি অনুযায়ী 'Available' বেড খুঁজে বের করা
 app.get('/api/available-beds/:category', async (req, res) => {
     const { category } = req.params;
     try {
@@ -1051,25 +961,22 @@ app.get('/api/available-beds/:category', async (req, res) => {
     }
 });
 
-// ২. স্টে ডিউরেশন স্ট্যাটাস এন্ডপয়েন্ট (Admin Only)
+
 app.get('/api/admin/stay-duration-stats', verifyToken, async (req, res) => {
     try {
-        // ১. রোল চেক: শুধুমাত্র Admin এই ডাটা দেখতে পারবে
         if (req.userRole !== 'Admin') {
             return res.status(403).json({ 
                 success: false, 
-                message: "আপনার এই পরিসংখ্যান দেখার অনুমতি নেই।" 
+                message: "Access Denied. Data only for admins!" 
             });
         }
 
         const { fromDate, toDate } = req.query;
 
-        // ভ্যালিডেশন: তারিখের সীমা না থাকলে এরর দিবে
         if (!fromDate || !toDate) {
             return res.status(400).json({ error: "Date range (fromDate, toDate) is required" });
         }
 
-        // ২. ডাটাবেস ফাংশন কল (get_stay_duration_stats)
         const result = await pool.query(
             `SELECT * FROM get_stay_duration_stats($1, $2)`,
             [fromDate, toDate]
@@ -1079,12 +986,11 @@ app.get('/api/admin/stay-duration-stats', verifyToken, async (req, res) => {
 
     } catch (err) {
         console.error("Stay Duration Stats Error:", err.message);
-        res.status(500).json({ error: "সার্ভার এরর: স্টে ডিউরেশন পরিসংখ্যান লোড করা যায়নি।" });
+        res.status(500).json({ error: "server error: Doctor_stats could not be loaded" });
     }
 });
 
 app.post('/api/patients/save-prescription', verifyToken, async (req, res) => {
-    // ডক্টর রোল চেক
     if (req.userRole !== 'Doctor') {
         return res.status(403).json({ success: false, message: "Access denied." });
     }
@@ -1095,7 +1001,6 @@ app.post('/api/patients/save-prescription', verifyToken, async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // ১. Medical Histories এ ডাটা ইনসার্ট (Multiple Rows)
         if (history && history.length > 0) {
             for (let h of history) {
                 if (h.condition) {
@@ -1108,7 +1013,6 @@ app.post('/api/patients/save-prescription', verifyToken, async (req, res) => {
             }
         }
 
-        // ২. Diagnosis এ ডাটা ইনসার্ট (Multiple Rows)
         if (diagnoses && diagnoses.length > 0) {
             for (let d of diagnoses) {
                 if (d.disease) {
@@ -1121,7 +1025,6 @@ app.post('/api/patients/save-prescription', verifyToken, async (req, res) => {
             }
         }
 
-        // ৩. পূর্ণাঙ্গ প্রিসক্রিপশন টেক্সট তৈরি করা (PDF Link Column এর জন্য)
         const fullPrescriptionText = `
             CHIEF COMPLAINTS: ${description}
             DIAGNOSIS: ${diagnoses.map(d => `${d.disease} (${d.severity})`).join(', ')}
@@ -1131,7 +1034,6 @@ app.post('/api/patients/save-prescription', verifyToken, async (req, res) => {
             ADVICE: ${advice}
         `.trim();
 
-        // ৪. Prescription টেবিলে ইনসার্ট
         await client.query(
             `INSERT INTO prescription (service_id, pdf_link) VALUES ($1, $2)`,
             [service_id, fullPrescriptionText]

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import medicineBg from '../assets/medicine_store.jpg'; // আপনার ইমেজের পাথ নিশ্চিত করুন
+import medicineBg from '../assets/medicine_store.jpg'; 
 
 const Medicines = () => {
     const [medicines, setMedicines] = useState([]);
@@ -12,7 +12,7 @@ useEffect(() => {
             return res.json();
         })
         .then(data => {
-            console.log("Medicines Data:", data); // কনসোলে ডাটা চেক করার জন্য
+            console.log("Medicines Data:", data); 
             setMedicines(data);
         })
         .catch(err => console.error("Fetch error:", err));
@@ -41,7 +41,7 @@ useEffect(() => {
     const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
     const styles = {
-        // ব্যাকগ্রাউন্ড ইমেজ সেটআপ
+        
         container: { 
             minHeight: '100vh', 
             width: '100%', 
@@ -55,7 +55,7 @@ useEffect(() => {
             padding: '40px 20px',
             fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
         },
-        // ফর্ম বা টেবিলের জন্য গ্লাস লুক
+        
         contentBox: {
             backgroundColor: 'rgba(255, 255, 255, 0.15)',
             backdropFilter: 'blur(12px)',

@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fa';
 import bgImage from '../assets/Receptionist_schedule.jpg';
 
-// --- Admit Patient Form Component ---
+
 const AdmitPatientForm = ({ getHeaders }) => {
     const [doctors, setDoctors] = useState([]);
     const [diseases, setDiseases] = useState([]);
@@ -135,7 +135,7 @@ const AdmitPatientForm = ({ getHeaders }) => {
     );
 };
 
-// --- Release Patient Form Component ---
+
 const ReleasePatientForm = ({ getHeaders }) => {
     const [releaseData, setReleaseData] = useState({ 
         admission_id: '', 
@@ -185,7 +185,7 @@ const ReleasePatientForm = ({ getHeaders }) => {
     );
 };
 
-// --- Main Dashboard Component ---
+
 const ReceptionistDashboard = () => {
     const navigate = useNavigate();
     const [view, setView] = useState('approval');

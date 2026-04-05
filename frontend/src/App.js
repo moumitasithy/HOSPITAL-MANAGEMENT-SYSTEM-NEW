@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// পেজগুলো ইমপোর্ট করা হচ্ছে
 import Home from './pages/Home';
 import Doctors from './pages/Doctor';
 import Login from './pages/login'; 
@@ -16,15 +15,14 @@ import ManageSchedule from './pages/ManageSchedule';
 import MedicalTests from './pages/MedicalTests';
 import ServePatient from './pages/ServePatient';
 import PendingDoctors from './pages/PendingDoctors';
-import DoctorList from './pages/ReceptionistList'; // আপনার ফাইল স্ট্রাকচার অনুযায়ী নাম চেক করে নিন
+import DoctorList from './pages/ReceptionistList';
 import DoctorStats from './pages/DoctorStats';
-import AdmitPatientForm from './pages/AdmitPatientForm'; // ফাইল নেম চেক করে নিন
-// --- আপডেট করা প্রোটেক্টেড রাউট ফাংশন ---
+import AdmitPatientForm from './pages/AdmitPatientForm';
+
 const ProtectedRoute = ({ children, allowedRole }) => {
     const userString = localStorage.getItem('user');
-    const token = localStorage.getItem('token'); // টোকেন চেক যোগ করা হয়েছে
+    const token = localStorage.getItem('token'); 
     
-    // ১. যদি টোকেন বা ইউজার ডাটা কোনোটিই না থাকে
     if (!token || !userString) {
         return <Navigate to="/login" replace />;
     }
@@ -32,18 +30,18 @@ const ProtectedRoute = ({ children, allowedRole }) => {
     try {
         const user = JSON.parse(userString);
         
-        // ২. ইউজারের রোল চেক করা
+       
         if (user.role !== allowedRole) {
-            // রোল না মিললে হোমে বা অন্য কোনো সেফ পেজে পাঠিয়ে দিন
+            
             console.warn("Unauthorized access attempt!");
             return <Navigate to="/" replace />;
         }
         
-        // ৩. সব ঠিক থাকলে পেজটি রেন্ডার হবে
+       
         return children;
     } catch (error) {
         console.error("Auth error:", error);
-        localStorage.clear(); // এরর হলে স্টোরেজ ক্লিয়ার করে লগইনে পাঠানো নিরাপদ
+        localStorage.clear();
         return <Navigate to="/login" replace />;
     }
 };
@@ -51,7 +49,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* সবার জন্য উন্মুক্ত রাউট */}
+        {}
         <Route path="/" element={<Home />} />
         <Route path="/Doctors" element={<Doctors />} />
         <Route path="/login" element={<Login />} />
@@ -60,7 +58,7 @@ function App() {
         <Route path="/medicines" element={<Medicines />} />
         <Route path="/medical-tests" element={<MedicalTests />} />
         
-        {/* অ্যাডমিন সেকশন */}
+        {}
         <Route 
           path="/admin-dashboard" 
           element={
@@ -94,7 +92,7 @@ function App() {
           } 
         />
 
-        {/* রিসেপশনিস্ট সেকশন */}
+        {}
         <Route 
           path="/receptionist-dashboard" 
           element={
@@ -112,7 +110,7 @@ function App() {
           } 
         />
 
-        {/* ডাক্তার সেকশন */}
+        {}
         <Route 
           path="/doctor-dashboard" 
           element={
@@ -146,11 +144,11 @@ function App() {
           } 
         />
 
-        {/* ভুল ইউআরএল দিলে হোমে ব্যাক করবে */}
+        {}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   )
 }
-// ফাইলের একদম শেষে এটি অবশ্যই থাকতে হবে
+
 export default App;

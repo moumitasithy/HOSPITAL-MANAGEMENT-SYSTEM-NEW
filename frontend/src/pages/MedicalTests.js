@@ -62,7 +62,6 @@ const MedicalTests = () => {
     );
 };
 
-// এই স্টাইলগুলো কার্ড ওভারল্যাপ হওয়া বন্ধ করবে
 const styles = {
     container: { 
         padding: '40px 20px', 

@@ -4,12 +4,11 @@ const DoctorsList = () => {
     const [doctors, setDoctors] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // ১. টোকেন গেট করার জন্য কমন ফাংশন
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token');
         return {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` // টোকেন পাঠানো হচ্ছে
+            'Authorization': `Bearer ${token}` 
         };
     };
 
@@ -21,7 +20,6 @@ const DoctorsList = () => {
         loader: { textAlign: 'center', padding: '20px', color: '#e74c3c' }
     };
 
-    // ২. ডাটা ফেচ করার ফাংশন (টোকেন সহ)
     const fetchDoctors = async () => {
         setLoading(true);
         try {
@@ -44,7 +42,6 @@ const DoctorsList = () => {
         fetchDoctors(); 
     }, []);
 
-    // ৩. ডিলিট করার ফাংশন (টোকেন সহ)
     const handleDelete = async (id) => {
         if (!window.confirm("Are you sure you want to delete this doctor?")) return;
         try {
@@ -52,7 +49,6 @@ const DoctorsList = () => {
                 method: 'DELETE',
                 headers: getAuthHeaders()
             });
-
             if (res.ok) {
                 alert("Doctor deleted successfully!");
                 fetchDoctors(); 

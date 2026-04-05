@@ -63,7 +63,7 @@ const Home = () => {
                     <li style={{cursor: 'pointer'}} onClick={() => navigate('/')}>HOME</li>
                     <li style={{cursor: 'pointer'}} onClick={() => navigate('/doctors')}>DOCTORS</li>
                     
-                    {/* সরাসরি অ্যাপয়েন্টমেন্ট বাটন (No Login Required) */}
+                    {}
                     <li 
                         style={styles.appointmentLink} 
                         onClick={() => navigate('/appointment')}
@@ -78,7 +78,7 @@ const Home = () => {
                         MEDICINES <FaCapsules />
                     </li>
                     
-                    {/* স্টাফ লগইন ড্রপডাউন */}
+                    {}
                     <div 
                         style={styles.dropdownContainer}
                         onMouseEnter={() => setShowDropdown(true)}
@@ -144,9 +144,9 @@ const Home = () => {
                             cursor: 'pointer', 
                             fontSize: '18px',
                             transition: '0.3s',
-                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)' // বাটনে একটু শ্যাডো যোগ করলে আরও সুন্দর লাগবে
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)' 
                         }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#e0f2f1'} // হোভার ইফেক্ট
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#e0f2f1'}
                     onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
                     >
                         Medical Tests

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'; // useEffect যোগ করা হয়েছে
+import React, { useEffect } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import {
     FaCalendarPlus, FaUserMd, FaSignOutAlt,
@@ -9,9 +9,9 @@ import bgImage from '../assets/Doctor_schedule.jpg';
 const DoctorDashboard = () => {
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem('user'));
-    const token = localStorage.getItem('token'); // টোকেন রিড করা
+    const token = localStorage.getItem('token');
 
-    // ১. সিকিউরিটি চেক: টোকেন না থাকলে লগইন পেজে পাঠিয়ে দিবে
+
     useEffect(() => {
         if (!token || user?.role !== 'Doctor') {
             localStorage.removeItem('token');
@@ -23,7 +23,6 @@ const DoctorDashboard = () => {
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        // সরাসরি window.location ব্যবহার করা ভালো যাতে সব স্টেট ক্লিয়ার হয়
         window.location.href = '/login';
     };
 
@@ -108,7 +107,6 @@ const DoctorDashboard = () => {
         e.currentTarget.style.filter = 'brightness(1)';
     };
 
-    // যদি ইউজার না থাকে তবে ব্ল্যাঙ্ক স্ক্রিন দেখাবে যতক্ষণ রিডাইরেক্ট না হয়
     if (!token) return null;
 
     return (
