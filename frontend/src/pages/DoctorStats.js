@@ -27,7 +27,6 @@ const DoctorStats = () => {
                     url = `http://localhost:5000/api/admin/stay-duration-stats?fromDate=${fromDate}&toDate=${toDate}`;
                 }
 
-                
                 const res = await fetch(url, {
                     method: 'GET',
                     headers: {
@@ -76,7 +75,7 @@ const DoctorStats = () => {
                             </select>
                             <input type="number" value={year} onChange={(e) => setYear(e.target.value)} style={{...styles.input, width: '80px'}} />
                         </>
-                    ) : activeSubView === 'disease' ? (
+                    ) : (activeSubView === 'disease' || activeSubView === 'stay') ? ( 
                         <>
                             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={styles.input} />
                             <span style={{color: '#666'}}>to</span>
